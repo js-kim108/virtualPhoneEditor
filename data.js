@@ -5,7 +5,7 @@
 //  written as "img/filename.jpg". Leave src empty for a
 //  colored placeholder.
 // ============================================================
-
+ 
 window.PHONE_DATA = {
   story: {
     title: "The Last Train",
@@ -15,15 +15,16 @@ window.PHONE_DATA = {
       "Ten minutes later he was still reading."
     ]
   },
-
+ 
   owner: {
     name: "Seo-yeon",
     time: "23:47",            // leave "" to show the real time
     date: "Friday, October 16",
     battery: 23,
-    wallpaper: ""             // e.g. "img/wallpaper.jpg"
+    wallpaper: "",            // e.g. "img/wallpaper.jpg"
+    lockScreen: true          // false = skip the lock screen and open on the home screen
   },
-
+ 
   // type: "missed" | "incoming" | "outgoing"
   calls: [
     { name: "Mom", type: "missed", time: "23:02", count: 2 },
@@ -32,7 +33,7 @@ window.PHONE_DATA = {
     { name: "Hana", type: "incoming", time: "Yesterday", duration: "3:02" },
     { name: "Jun", type: "missed", time: "Yesterday" }
   ],
-
+ 
   // A search can be plain text, or { q, results: [{ title, snippet }] }
   searches: [
     {
@@ -47,7 +48,7 @@ window.PHONE_DATA = {
     "does he like me quiz",
     "1-way ticket Seoul to Busan"
   ],
-
+ 
   // unread: number shown on the app icon badge
   messages: [
     {
@@ -67,7 +68,7 @@ window.PHONE_DATA = {
       ]
     }
   ],
-
+ 
   // group: true shows each sender's name
   chats: [
     {
@@ -89,7 +90,7 @@ window.PHONE_DATA = {
       ]
     }
   ],
-
+ 
   notes: [
     {
       title: "Things to say tonight",
@@ -102,13 +103,13 @@ window.PHONE_DATA = {
       body: "- books (donate half)\n- winter coat\n- the mug he gave me\n- chargers"
     }
   ],
-
+ 
   // Shown newest first, in the order written here
   translations: [
     { from: "English", to: "Korean", input: "I'll miss you.", output: "보고 싶을 거야." },
     { from: "Korean", to: "English", input: "가지 마", output: "Don't go" }
   ],
-
+ 
   // color is used when there's no image
   photos: [
     { src: "", caption: "Our café, first visit", date: "March 3", color: "#c08457" },
