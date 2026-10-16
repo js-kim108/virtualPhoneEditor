@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Phone Peek</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <main class="story">
+    <h1 id="story-title"></h1>
+    <article id="story-body"></article>
+  </main>
+
+  <div class="overlay" id="overlay" hidden>
+    <button class="close" id="close" type="button" aria-label="Close phone">✕</button>
+    <div class="phone" role="dialog" aria-modal="true" aria-label="Phone">
+      <div class="display" id="display">
+        <div class="status">
+          <span id="status-time"></span>
+          <span class="island"></span>
+          <span id="status-battery"></span>
+        </div>
+        <div class="screen" id="screen"></div>
+        <button class="homebar" id="homebar" type="button" aria-label="Home screen"></button>
+      </div>
+    </div>
+  </div>
+
+  <script src="data.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
