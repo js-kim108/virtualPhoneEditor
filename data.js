@@ -10,7 +10,7 @@ window.PHONE_DATA = {
   story: {
     title: "실종",
     paragraphs: [
-      [["유성운씨의 폰이다."]]
+      "[[유성운씨의 폰이다.]]"
     ]
   },
 
