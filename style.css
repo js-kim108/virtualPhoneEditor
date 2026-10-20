@@ -146,6 +146,27 @@ body.locked { overflow: hidden; }
 @keyframes pop  { from { transform: scale(1.15); opacity: 0; } }
 
 /* ============================================================
+   Swiping
+   ============================================================ */
+/* Rows you swipe left/right through (home screen pages, photos) */
+.hscroll {
+  display: flex; overflow-x: auto; overflow-y: hidden;
+  scroll-snap-type: x mandatory; overscroll-behavior-x: contain;
+  scrollbar-width: none; touch-action: pan-x;
+}
+.hscroll::-webkit-scrollbar { display: none; }
+.hscroll > * { flex: 0 0 100%; min-width: 0; scroll-snap-align: start; scroll-snap-stop: always; }
+.hscroll.dragging { scroll-snap-type: none; cursor: grabbing; }
+
+/* Let the phone handle sideways finger swipes itself (for swipe-back) */
+.screen, .page, .app-body { touch-action: pan-y; }
+.lock, .lock .app-body, .lock .notifs, .homebar { touch-action: none; }
+
+/* Swipe back: the screen being dragged away and the one underneath */
+.page.under { z-index: 1; }
+.page.swiping { z-index: 3; box-shadow: -10px 0 30px rgba(0, 0, 0, .15); }
+
+/* ============================================================
    Lock screen
    ============================================================ */
 .lock { color: #fff; text-align: center; cursor: pointer; }
@@ -218,9 +239,14 @@ body.locked { overflow: hidden; }
   border-radius: 12px; background: #ff3b30; color: #fff;
   font-size: 14px; font-weight: 600; display: grid; place-items: center;
 }
-.page-dots { margin-top: auto; display: flex; justify-content: center; gap: 8px; padding-bottom: 14px; }
-.page-dots i { width: 7px; height: 7px; border-radius: 50%; background: rgba(255, 255, 255, .45); }
-.page-dots i.on { background: #fff; }
+.hpages { flex: 1; min-height: 0; }
+.page-dots { display: flex; justify-content: center; gap: 2px; padding-bottom: 10px; }
+.page-dots button {
+  width: 16px; height: 16px; padding: 0; border: 0; background: none; cursor: pointer;
+  display: grid; place-items: center;
+}
+.page-dots button::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: rgba(255, 255, 255, .45); transition: background .2s; }
+.page-dots button.on::before { background: #fff; }
 .dock {
   margin: 0 12px 30px; padding: 16px 12px; border-radius: 34px;
   display: grid; grid-template-columns: repeat(4, 1fr); justify-items: center;
@@ -473,7 +499,10 @@ body.locked { overflow: hidden; }
 .nav-2l { display: flex; flex-direction: column; align-items: center; line-height: 1.2; }
 .nav-2l b { font-size: 16px; font-weight: 600; }
 .nav-2l span { max-width: 200px; font-size: 12px; opacity: .7; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.photo-view .app-body { display: flex; align-items: center; }
+.nav-2l span:empty { display: none; }
+.photo-view .app-body { display: flex; }
+.pstrip { flex: 1; }
+.pslide { display: flex; align-items: center; }
 .pfull { width: 100%; }
 .pfull img { display: block; width: 100%; max-height: 100%; object-fit: contain; }
 .pfull .ph { display: block; width: 100%; aspect-ratio: 3 / 4; }
