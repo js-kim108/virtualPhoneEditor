@@ -8,19 +8,17 @@
 
 window.PHONE_DATA = {
   story: {
-    title: "The Last Train",
+    title: "실종",
     paragraphs: [
-      "Seo-yeon left her phone on the café table when she ran for the last train. By the time Jun noticed, the door had already swung shut behind her.",
-      "He picked it up. The screen lit at his touch, no lock. He told himself he would only look for a number to call. [[Open her phone]]",
-      "Ten minutes later he was still reading."
+      "유성운씨의 폰이다."
     ]
   },
 
   owner: {
-    name: "Seo-yeon",
-    time: "23:47",            // leave "" to show the real time
-    date: "Friday, October 16",
-    battery: 23,
+    name: "유성운",
+    time: "05:37",            // leave "" to show the real time
+    date: "금요일, 10월 13일",
+    battery: 21,
     wallpaper: "",            // e.g. "img/wallpaper.jpg"
     lockScreen: true          // false = skip the lock screen and open on the home screen
   },
