@@ -102,6 +102,10 @@
     clock: svg('<circle cx="12" cy="12" r="8" fill="none" stroke="#fff" stroke-width="2.2"/><path d="M12 7.5V12l3 2" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round"/>'),
     moon: svg('<path fill="#ffe08a" d="M14 3a9 9 0 1 0 7 14.5A7.5 7.5 0 0 1 14 3z"/><circle cx="18.5" cy="6" r=".9" fill="#fff"/><circle cx="20.5" cy="10" r=".6" fill="#fff"/>'),
     gear: svg('<circle cx="12" cy="12" r="6.2" fill="none" stroke="#fff" stroke-width="2"/><circle cx="12" cy="12" r="2.6" fill="none" stroke="#fff" stroke-width="2"/><path d="M12 2.8v3M12 18.2v3M2.8 12h3M18.2 12h3M5.5 5.5l2.1 2.1M16.4 16.4l2.1 2.1M5.5 18.5l2.1-2.1M16.4 7.6l2.1-2.1" stroke="#fff" stroke-width="2.4" stroke-linecap="round"/>'),
+    mail: svg('<rect x="3" y="6" width="18" height="12.5" rx="2.2" fill="#fff"/><path d="M3.8 7.2 12 13.2l8.2-6" fill="none" stroke="#2a8cff" stroke-width="1.6" stroke-linejoin="round"/>'),
+    music: svg('<path fill="#fff" d="M17 3.5v11.3a3 3 0 1 1-1.8-2.75V7.3L9.8 8.6v8.2a3 3 0 1 1-1.8-2.75V6.6z"/>'),
+    maps: svg('<path fill="#fff" d="M12 3a6 6 0 0 0-6 6c0 4.5 6 11 6 11s6-6.5 6-11a6 6 0 0 0-6-6z"/><circle cx="12" cy="9" r="2.3" fill="#2fb34f"/>'),
+    books: svg('<path fill="#fff" d="M3 6.5c2.8-1.3 5.8-1.3 8.2.4v12c-2.4-1.6-5.4-1.6-8.2-.4zM21 6.5c-2.8-1.3-5.8-1.3-8.2.4v12c2.4-1.6 5.4-1.6 8.2-.4z"/>'),
     calendar: function () {
       var dp = dateParts();
       var font = "-apple-system,Inter,Arial,sans-serif";
@@ -130,9 +134,16 @@
     camera: { label: "Camera", deco: true, bg: "linear-gradient(#f0f0f3,#a7a7b0)", glyph: G.camera },
     clock: { label: "Clock", deco: true, bg: "linear-gradient(#ff9a3c,#ff5b3a)", glyph: G.clock },
     weather: { label: "Weather", deco: true, bg: "linear-gradient(#34428a,#0e1440)", glyph: G.moon },
-    settings: { label: "Settings", deco: true, bg: "linear-gradient(#8e9bb3,#566279)", glyph: G.gear }
+    settings: { label: "Settings", deco: true, bg: "linear-gradient(#8e9bb3,#566279)", glyph: G.gear },
+    mail: { label: "Mail", deco: true, bg: "linear-gradient(#5fc2ff,#1a7cf5)", glyph: G.mail },
+    music: { label: "Music", deco: true, bg: "linear-gradient(#ff6b8a,#fa2d48)", glyph: G.music },
+    maps: { label: "Maps", deco: true, bg: "linear-gradient(#7be08f,#2fb34f)", glyph: G.maps },
+    books: { label: "Books", deco: true, bg: "linear-gradient(#ffb13b,#ff8a00)", glyph: G.books }
   };
+  // Home screen pages (swipe left/right between them) and the dock
   var GRID = ["calendar", "photos", "camera", "notes", "translate", "clock", "weather", "settings"];
+  var GRID2 = ["mail", "music", "maps", "books"];
+  var homePage = 0;
   var DOCK = ["calls", "search", "messages", "chat"];
 
   function appIcon(id, inDock) {
@@ -273,9 +284,22 @@
     home: function () {
       return {
         nav: false, dark: true, cls: "home",
-        html: '<div class="home-grid">' + GRID.map(function (id) { return appIcon(id); }).join("") + "</div>" +
-          '<div class="page-dots"><i class="on"></i><i></i></div>' +
-          '<div class="dock">' + DOCK.map(function (id) { return appIcon(id, true); }).join("") + "</div>"
+        html: '<div class="hpages hscroll">' + [GRID, GRID2].map(function (ids) {
+            return '<div class="hpage"><div class="home-grid">' + ids.map(function (id) { return appIcon(id); }).join("") + "</div></div>";
+          }).join("") + "</div>" +
+          '<div class="page-dots">' + [0, 1].map(function (i) {
+            return '<button type="button" data-page="' + i + '"' + (i === homePage ? ' class="on"' : "") + ' aria-label="Page ' + (i + 1) + '"></button>';
+          }).join("") + "</div>" +
+          '<div class="dock">' + DOCK.map(function (id) { return appIcon(id, true); }).join("") + "</div>",
+        after: function (body, page) {
+          var h = page.querySelector(".hpages");
+          var dots = page.querySelectorAll(".page-dots button");
+          h.scrollLeft = homePage * h.clientWidth;
+          h.addEventListener("scroll", function () {
+            homePage = Math.round(h.scrollLeft / (h.clientWidth || 1));
+            Array.prototype.forEach.call(dots, function (d, i) { d.classList.toggle("on", i === homePage); });
+          });
+        }
       };
     },
 
@@ -409,12 +433,30 @@
       };
     },
 
+    // One photo at a time; swipe left/right for the next/previous one, swipe down to close
     photo: function (i) {
-      var p = (D.photos || [])[i] || {};
+      var list = D.photos || [];
+      var cur = +i || 0;
+      var p = list[cur] || {};
       return {
         title: p.date || "Photo", dark: true, cls: "photo-view",
-        navCenter: '<div class="nav-2l"><b>' + esc(p.date || "") + "</b>" + (p.caption ? "<span>" + esc(p.caption) + "</span>" : "") + "</div>",
-        html: '<div class="pfull">' + photoEl(p) + "</div>"
+        navCenter: '<div class="nav-2l"><b class="pv-date">' + esc(p.date || "") + '</b><span class="pv-cap">' + esc(p.caption || "") + "</span></div>",
+        html: '<div class="pstrip hscroll">' + list.map(function (q) {
+          return '<div class="pslide"><div class="pfull">' + photoEl(q) + "</div></div>";
+        }).join("") + "</div>",
+        after: function (body, page) {
+          var s = page.querySelector(".pstrip");
+          s.scrollLeft = cur * s.clientWidth;
+          s.addEventListener("scroll", function () {
+            var k = Math.round(s.scrollLeft / (s.clientWidth || 1));
+            if (k === cur || !list[k]) return;
+            cur = k;
+            page.querySelector(".pv-date").textContent = list[k].date || "";
+            page.querySelector(".pv-cap").textContent = list[k].caption || "";
+            var top = stack[stack.length - 1];
+            if (top && top[0] === "photo") top[1] = k;
+          });
+        }
       };
     }
   };
@@ -427,49 +469,35 @@
   var display = $("#display");
   var overlay = $("#overlay");
   var justSwiped = false;
+  var busy = false;
 
   function topName() { return stack.length ? stack[stack.length - 1][0] : ""; }
 
-  function backLabel() {
-    if (stack.length < 3) return null; // the first screen of an app has no back button, like on iPhone
-    var p = stack[stack.length - 2];
+  // The back button shows the previous screen's name.
+  // The first screen of an app has no back button, like on iPhone.
+  function backLabel(index) {
+    if (index < 2) return null;
+    var p = stack[index - 1];
     var v = VIEWS[p[0]](p[1]);
     return v.short || v.title || "Back";
   }
 
+  function currentPage() {
+    var pages = screen.querySelectorAll(".page:not(.leaving)");
+    return pages[pages.length - 1] || null;
+  }
+
+  // Status bar color, and whether the close button shows on phones
+  function chrome(page) {
+    display.classList.toggle("dark-ui", !!page._v.dark);
+    overlay.classList.toggle("at-home", page._name === "home" || page._name === "lock");
+  }
+
   function draw(anim) {
-    var top = stack[stack.length - 1];
-    var v = VIEWS[top[0]](top[1]);
-
-    display.classList.toggle("dark-ui", !!v.dark);
-    overlay.classList.toggle("at-home", top[0] === "home" || top[0] === "lock");
-
-    Array.prototype.forEach.call(screen.querySelectorAll(".page.leaving"), function (p) { p.remove(); });
-    var old = screen.querySelector(".page");
-
-    var nav = "";
-    if (v.nav !== false) {
-      var back = backLabel();
-      var left = back !== null
-        ? '<button class="nav-back" type="button" data-back>' + I.chev + "<span>" + esc(back) + "</span></button>"
-        : (v.navLeft || "");
-      nav = '<header class="nav"><div class="nav-left">' + left + '</div><div class="nav-center">' +
-        (v.navCenter || '<span class="nav-title">' + esc(v.title || "") + "</span>") +
-        '</div><div class="nav-right">' + (v.navRight || "") + "</div></header>";
-    }
-
-    var page = document.createElement("div");
-    page.className = "page view-" + top[0] + (v.cls ? " " + v.cls : "") + (v.large ? " has-large" : "") +
-      (v.foot ? " has-foot" : "") + (anim ? " in-" + anim : "");
-    page.innerHTML = nav + '<div class="app-body">' +
-      (v.large ? '<h1 class="large-title">' + esc(v.title) + "</h1>" : "") + v.html + "</div>" + (v.foot || "");
-    screen.appendChild(page);
-
-    var body = page.querySelector(".app-body");
-    if (v.large) {
-      body.addEventListener("scroll", function () { page.classList.toggle("scrolled", body.scrollTop > 30); });
-    }
-    if (v.after) v.after(body);
+    Array.prototype.forEach.call(screen.querySelectorAll(".page.leaving, .page.under"), function (p) { p.remove(); });
+    var old = currentPage();
+    var page = build(stack.length - 1, anim);
+    chrome(page);
 
     if (old) {
       if (anim === "push" || anim === "pop") {
@@ -479,6 +507,40 @@
         old.remove();
       }
     }
+  }
+
+  // Builds the screen for stack[index] and puts it on the phone
+  // (underneath `before` if given, otherwise on top)
+  function build(index, anim, before) {
+    var entry = stack[index];
+    var v = VIEWS[entry[0]](entry[1]);
+
+    var nav = "";
+    if (v.nav !== false) {
+      var back = backLabel(index);
+      var left = back !== null
+        ? '<button class="nav-back" type="button" data-back>' + I.chev + "<span>" + esc(back) + "</span></button>"
+        : (v.navLeft || "");
+      nav = '<header class="nav"><div class="nav-left">' + left + '</div><div class="nav-center">' +
+        (v.navCenter || '<span class="nav-title">' + esc(v.title || "") + "</span>") +
+        '</div><div class="nav-right">' + (v.navRight || "") + "</div></header>";
+    }
+
+    var page = document.createElement("div");
+    page.className = "page view-" + entry[0] + (v.cls ? " " + v.cls : "") + (v.large ? " has-large" : "") +
+      (v.foot ? " has-foot" : "") + (anim ? " in-" + anim : "");
+    page.innerHTML = nav + '<div class="app-body">' +
+      (v.large ? '<h1 class="large-title">' + esc(v.title) + "</h1>" : "") + v.html + "</div>" + (v.foot || "");
+    page._v = v;
+    page._name = entry[0];
+    screen.insertBefore(page, before || null);
+
+    var body = page.querySelector(".app-body");
+    if (v.large) {
+      body.addEventListener("scroll", function () { page.classList.toggle("scrolled", body.scrollTop > 30); });
+    }
+    if (v.after) v.after(body, page);
+    return page;
   }
 
   function go(view, arg) { stack.push([view, arg]); draw("push"); }
@@ -511,6 +573,7 @@
   }
 
   function openPhone() {
+    homePage = 0;
     stack = owner.lockScreen === false ? [["home"]] : [["lock"]];
     draw("");
     overlay.hidden = false;
@@ -544,7 +607,7 @@
   });
 
   screen.addEventListener("click", function (e) {
-    if (justSwiped) { justSwiped = false; return; }
+    if (justSwiped || busy) { justSwiped = false; return; }
     var t = e.target, el;
 
     if (topName() === "lock") {
@@ -552,6 +615,11 @@
       return unlock(el ? +el.getAttribute("data-notif") : null);
     }
     if (t.closest("[data-back]")) return back();
+    if ((el = t.closest("[data-page]"))) {
+      var h = currentPage().querySelector(".hpages");
+      if (h) h.scrollTo({ left: +el.getAttribute("data-page") * h.clientWidth, behavior: "smooth" });
+      return;
+    }
     if ((el = t.closest("[data-open]"))) {
       stack = [["home"], [el.getAttribute("data-open")]];
       return draw("open");
@@ -566,23 +634,166 @@
     if ((el = t.closest("[data-go]"))) go(el.getAttribute("data-go"), el.getAttribute("data-arg"));
   });
 
-  // swipe up on the lock screen to unlock
-  var startY = null;
-  screen.addEventListener("pointerdown", function (e) { startY = topName() === "lock" ? e.clientY : null; });
-  screen.addEventListener("pointerup", function (e) {
-    if (startY !== null && topName() === "lock" && e.clientY - startY < -50) {
-      justSwiped = true;
-      setTimeout(function () { justSwiped = false; }, 400);
-      unlock();
-    }
-    startY = null;
+  // ============================================================
+  //  swipe gestures (finger or mouse)
+  //  - swipe right inside an app ........ go back (the screen follows your finger)
+  //  - swipe left/right on home screen .. next / previous page
+  //  - swipe left/right on a photo ...... next / previous photo
+  //  - swipe down on a photo ............ close it
+  //  - swipe up on the lock screen ...... unlock
+  //  - swipe up on the bar at the bottom  go home
+  // ============================================================
+  var g = null;
+
+  function suppressClick() {
+    justSwiped = true;
+    setTimeout(function () { justSwiped = false; }, 350);
+  }
+
+  function capture(id) {
+    try { screen.setPointerCapture(id); } catch (err) { /* ignore */ }
+  }
+
+  screen.addEventListener("pointerdown", function (e) {
+    if (busy || e.button > 0 || display.querySelector(".alert-wrap")) return;
+    var n = e.target.closest(".notifs");
+    g = { id: e.pointerId, x: e.clientX, y: e.clientY, t: Date.now(), mode: null,
+      mouse: e.pointerType === "mouse", h: e.target.closest(".hscroll"),
+      // a long list of lock-screen notifications scrolls instead of unlocking
+      notifs: n && n.scrollHeight > n.clientHeight + 2 ? n : null,
+      lx: e.clientX, lt: Date.now(), vx: 0 };
   });
 
-  $("#homebar").addEventListener("click", goHome);
+  screen.addEventListener("pointermove", function (e) {
+    if (!g || e.pointerId !== g.id) return;
+    var dx = e.clientX - g.x, dy = e.clientY - g.y;
+
+    // how fast the finger is moving right now (pixels per millisecond)
+    var now = Date.now();
+    if (now > g.lt) g.vx = 0.6 * (e.clientX - g.lx) / (now - g.lt) + 0.4 * g.vx;
+    g.lx = e.clientX;
+    g.lt = now;
+
+    if (g.mode === "hdrag") { g.h.scrollLeft = g.left - dx; return; }
+    if (g.mode === "back") { moveBack(dx); return; }
+    if (g.mode === "nscroll") { g.notifs.scrollTop = g.top - dy; return; }
+    if (g.mode) return;
+    if (Math.abs(dx) < 10 && Math.abs(dy) < 10) return;
+
+    var horizontal = Math.abs(dx) > Math.abs(dy) * 1.2;
+    if (!horizontal && g.notifs && topName() === "lock") {
+      g.mode = "nscroll";
+      g.top = g.notifs.scrollTop + dy;
+      capture(e.pointerId);
+    } else if (horizontal && g.h && g.mouse) {
+      // Mouse drag on the home pages or photos (on touch screens these scroll by themselves)
+      g.mode = "hdrag";
+      g.from = Math.round(g.h.scrollLeft / (g.h.clientWidth || 1));
+      g.left = g.h.scrollLeft + dx;
+      g.h.classList.add("dragging");
+      capture(e.pointerId);
+    } else if (horizontal && dx > 0 && !g.h && stack.length >= 3) {
+      startBack(e);
+      moveBack(dx);
+    } else {
+      g.mode = "other";
+    }
+  });
+
+  function endGesture(e, cancelled) {
+    if (!g || e.pointerId !== g.id) return;
+    var s = g;
+    g = null;
+    var dx = e.clientX - s.x, dy = e.clientY - s.y;
+    var speed = Date.now() - s.lt > 80 ? 0 : s.vx; // finger paused before lifting = no flick
+    if (s.mode === "nscroll") { suppressClick(); return; }
+    if (s.mode === "hdrag") { suppressClick(); return endHDrag(s, dx, speed); }
+    if (s.mode === "back") { suppressClick(); return endBack(s, dx, speed, cancelled); }
+    if (cancelled) return;
+    if (topName() === "lock" && dy < -50) { suppressClick(); return unlock(); }
+    if (topName() === "photo" && dy > 90 && dy > Math.abs(dx) * 1.5) { suppressClick(); return back(); }
+  }
+  screen.addEventListener("pointerup", function (e) { endGesture(e, false); });
+  screen.addEventListener("pointercancel", function (e) { endGesture(e, true); });
+
+  // Snap a mouse-dragged row to the nearest page
+  function endHDrag(s, dx, speed) {
+    var h = s.h, w = h.clientWidth || 1;
+    var n = Math.max(1, Math.round(h.scrollWidth / w));
+    var k = s.from;
+    if (dx < -w * 0.2 || speed < -0.35) k++;
+    else if (dx > w * 0.2 || speed > 0.35) k--;
+    k = Math.max(0, Math.min(n - 1, k));
+    h.scrollTo({ left: k * w, behavior: "smooth" });
+    setTimeout(function () { h.classList.remove("dragging"); }, 450);
+  }
+
+  // Swipe back: the previous screen is built underneath and slides in as you drag
+  function startBack(e) {
+    var cur = currentPage();
+    if (!cur) { g.mode = "other"; return; }
+    g.mode = "back";
+    g.cur = cur;
+    g.w = screen.clientWidth;
+    g.under = build(stack.length - 2, "", cur);
+    g.under.classList.add("under");
+    cur.classList.add("swiping");
+    capture(e.pointerId);
+  }
+
+  function moveBack(dx) {
+    var d = Math.max(0, Math.min(g.w, dx));
+    g.cur.style.transform = "translateX(" + d + "px)";
+    g.under.style.transform = "translateX(" + (-0.3 * (g.w - d)) + "px)";
+  }
+
+  function endBack(s, dx, speed, cancelled) {
+    var cur = s.cur, under = s.under, w = s.w;
+    // go back if dragged past the middle, or flicked quickly to the right
+    var commit = !cancelled && (dx > w * 0.45 || (speed > 0.35 && dx > 30));
+    busy = true;
+    cur.style.transition = under.style.transition = "transform .3s cubic-bezier(.2,.85,.25,1)";
+    cur.style.transform = "translateX(" + (commit ? w : 0) + "px)";
+    under.style.transform = "translateX(" + (commit ? 0 : -0.3 * w) + "px)";
+    setTimeout(function () {
+      busy = false;
+      if (commit) {
+        cur.remove();
+        under.classList.remove("under");
+        under.style.transition = under.style.transform = "";
+        stack.pop();
+        chrome(under);
+      } else {
+        under.remove();
+        cur.classList.remove("swiping");
+        cur.style.transition = cur.style.transform = "";
+      }
+    }, 310);
+  }
+
+  // Swipe up on the bar at the bottom to go home (tapping it works too)
+  var barY = null;
+  $("#homebar").addEventListener("pointerdown", function (e) { barY = e.clientY; });
+  window.addEventListener("pointerup", function (e) {
+    if (barY !== null && e.clientY - barY < -25 && !overlay.hidden && !busy) goHome();
+    barY = null;
+  });
+  $("#homebar").addEventListener("click", function () { if (!busy) goHome(); });
+
+  // Stop the browser from dragging images around instead of swiping
+  display.addEventListener("dragstart", function (e) { e.preventDefault(); });
+
   $("#close").addEventListener("click", closePhone);
   overlay.addEventListener("click", function (e) { if (e.target === overlay) closePhone(); });
   document.addEventListener("keydown", function (e) {
-    if (e.key !== "Escape" || overlay.hidden) return;
+    if (overlay.hidden || busy) return;
+    if (e.key === "ArrowLeft" || e.key === "ArrowRight") {
+      var page = currentPage();
+      var h = page && page.querySelector(".hscroll");
+      if (h) h.scrollBy({ left: (e.key === "ArrowRight" ? 1 : -1) * h.clientWidth, behavior: "smooth" });
+      return;
+    }
+    if (e.key !== "Escape") return;
     if (document.querySelector(".alert-wrap")) return document.querySelector(".alert-wrap").remove();
     if (topName() === "lock") return closePhone();
     back();
