@@ -67,6 +67,40 @@ window.PHONE_DATA = {
     { name: "Jun", type: "missed", time: "Yesterday" }
   ],
 
+  // Contacts: readers can call or text these people
+  // (Phone app → Contacts, or tap a name in Recents / a conversation).
+  // Without this list, everyone in calls, messages and chats becomes a contact.
+  //
+  //   phone: "010-..."                        shown on their contact card
+  //   call: { answer: true, lines: [...] }    they pick up and say these lines
+  //   call: { message: "..." }                a recorded message plays instead
+  //   (no call)                               it rings, then "No Answer"
+  //   replies: [...]                          their replies when the reader texts them, in order
+  //   delivered: false                        texts to them fail ("Not Delivered")
+  //   note: "..."                             a note on their contact card
+  //   photo: "img/mom.jpg"                    their picture
+  contacts: [
+    {
+      name: "Mom", phone: "010-2847-1193",
+      replies: ["Where are you?", "Pick up your phone. Now."]
+    },
+    {
+      name: "Jun", phone: "010-5520-7781",
+      call: { answer: true, lines: ["Hello?", "...Hello? Who is this?", "Why aren't you saying anything?"] },
+      replies: ["who is this?"]
+    },
+    {
+      name: "Hana", phone: "010-3391-0456",
+      call: { message: { en: "The number you have dialed is not available. Please try again later.",
+                         ko: "지금 거신 전화는 전원이 꺼져 있어 음성사서함으로 연결됩니다." } },
+      note: "Book club"
+    },
+    {
+      name: "Unknown", phone: "02-555-0132",
+      delivered: false
+    }
+  ],
+
   // A search can be plain text, or { q, results: [{ title, snippet }] }
   searches: [
     {
