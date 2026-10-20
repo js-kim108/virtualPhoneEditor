@@ -218,8 +218,19 @@
     return svg(art[name] || art.sun, null, "wi");
   }
 
-  function sum(list, key) {
-    return (list || []).reduce(function (n, x) { return n + (x[key] || 0); }, 0);
+  // ---------- unread messages ----------
+  // Conversations the reader has opened count as read: their unread dot/count,
+  // the app icon badge and the lock-screen notification disappear.
+  // (Remembered until the page is reloaded.)
+  var READ = {};
+
+  function unread(kind, i) {
+    var t = (D[kind] || [])[i];
+    return t && !READ[kind + ":" + i] ? (+t.unread || 0) : 0;
+  }
+
+  function unreadTotal(kind) {
+    return (D[kind] || []).reduce(function (n, t, i) { return n + unread(kind, i); }, 0);
   }
 
   function empty(text) { return '<p class="empty">' + esc(text || T("Nothing here.")) + "</p>"; }
@@ -301,9 +312,9 @@
       badge: function () { return (D.calls || []).filter(function (c) { return c.type === "missed"; }).length; } },
     search: { label: "Search", view: "search", bg: "linear-gradient(#6cb7ff,#1867f2)", glyph: G.search },
     messages: { label: "Messages", view: "messages", bg: "linear-gradient(#7ad7ff,#1d95ee)", glyph: G.bubble,
-      badge: function () { return sum(D.messages, "unread"); } },
+      badge: function () { return unreadTotal("messages"); } },
     chat: { label: "Chat", view: "chat", bg: "linear-gradient(#ffd75e,#ff9f1c)", glyph: G.chat,
-      badge: function () { return sum(D.chats, "unread"); } },
+      badge: function () { return unreadTotal("chats"); } },
     notes: { label: "Notes", view: "notes", bg: "#fff", glyph: G.notes, full: true },
     translate: { label: "Translate", view: "translate", bg: "linear-gradient(#6a78ff,#2b30c4)", glyph: G.translate },
     photos: { label: "Photos", view: "photos", bg: "linear-gradient(#ffb36b,#ff5f6d)", glyph: G.photos },
@@ -374,14 +385,15 @@
     var out = [];
     [["messages", "messages"], ["chats", "chat"]].forEach(function (pair) {
       (D[pair[0]] || []).forEach(function (t, i) {
-        if (!t.unread) return;
+        var u = unread(pair[0], i);
+        if (!u) return;
         var thread = t.thread || [];
         var them = thread.filter(function (m) { return m.from !== "me"; });
         var last = them[them.length - 1] || thread[thread.length - 1] || {};
         out.push({
           app: pair[1], title: t.name, time: last.time,
           body: (t.group ? last.from + ": " : "") + last.text,
-          more: t.unread > 1 ? t.unread - 1 : 0,
+          more: u > 1 ? u - 1 : 0,
           stack: [["home"], [pair[1]], ["thread", pair[0] + ":" + i]]
         });
       });
@@ -437,13 +449,14 @@
     if (!list || !list.length) return empty();
     return '<ul class="tlist' + (kt ? " kt" : "") + '">' + list.map(function (t, i) {
       var last = (t.thread && t.thread[t.thread.length - 1]) || {};
-      return '<li><button class="trow" type="button" data-go="thread" data-arg="' + kind + ":" + i + '">' +
-        (kt ? "" : '<span class="udot' + (t.unread ? " on" : "") + '"></span>') +
+      var u = unread(kind, i);
+      return '<li><button class="trow' + (u ? " is-unread" : "") + '" type="button" data-go="thread" data-arg="' + kind + ":" + i + '">' +
+        (kt ? "" : '<span class="udot' + (u ? " on" : "") + '"></span>') +
         avatar(t.name, t.avatar, kt ? "sq" : "") +
         '<span class="t-main"><span class="t-top"><b>' + esc(t.name) + '</b><span class="t-time">' +
         esc(last.time) + (kt ? "" : I.chevR) + "</span></span>" +
         '<span class="t-prev"><span class="t-prev-txt">' + esc(last.text) + "</span>" +
-        (kt && t.unread ? '<span class="kt-badge">' + t.unread + "</span>" : "") + "</span></span></button></li>";
+        (kt && u ? '<span class="kt-badge">' + (u > 300 ? "300+" : u) + "</span>" : "") + "</span></span></button></li>";
     }).join("") + "</ul>";
   }
 
@@ -625,6 +638,7 @@
     },
 
     thread: function (arg) {
+      READ[arg] = true; // opening a conversation marks it as read
       var parts = String(arg).split(":");
       var kind = parts[0];
       var t = (D[kind] || [])[+parts[1]] || { name: "", thread: [] };
