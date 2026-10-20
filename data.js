@@ -60,11 +60,11 @@ window.PHONE_DATA = {
 
   // type: "missed" | "incoming" | "outgoing"
   calls: [
-    { name: "Mom", type: "missed", time: "23:02", count: 2 },
-    { name: "Jun", type: "outgoing", time: "21:15", duration: "0:04" },
+    { name: "Gio", type: "missed", time: "23:02", count: 2 },
+    { name: "Juhyeon", type: "outgoing", time: "21:15", duration: "30:04" },
     { name: "Unknown", type: "incoming", time: "18:40", duration: "12:31" },
     { name: "Hana", type: "incoming", time: "Yesterday", duration: "3:02" },
-    { name: "Jun", type: "missed", time: "Yesterday" }
+    { name: "Juhyeon", type: "missed", time: "Yesterday" }
   ],
 
   // Contacts: readers can call or text these people
@@ -93,13 +93,13 @@ window.PHONE_DATA = {
       },
       en: 
       {
-        name: "Gio", phone: "010-2847-1193",
-        replies: ["Where are you?", "Please answer me."]
+        name: "Juhyeon", phone: "010-2348-2384",
+        replies: ["Who is it?"]
       },
       ko:
       {
-        name: "지오", phone: "010-2847-1193",
-        replies: ["어디십니까?","대답해주세요."]
+        name: "주현", phone: "010-2348-2384",
+        replies: ["누구십니까?"]
       }
     }
   ],
