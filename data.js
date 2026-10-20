@@ -81,23 +81,26 @@ window.PHONE_DATA = {
   //   photo: "img/mom.jpg"                    their picture
   contacts: [
     {
-      name: "Mom", phone: "010-2847-1193",
-      replies: ["Where are you?", "Pick up your phone. Now."]
-    },
-    {
-      name: "Jun", phone: "010-5520-7781",
-      call: { answer: true, lines: ["Hello?", "...Hello? Who is this?", "Why aren't you saying anything?"] },
-      replies: ["who is this?"]
-    },
-    {
-      name: "Hana", phone: "010-3391-0456",
-      call: { message: { en: "The number you have dialed is not available. Please try again later.",
-                         ko: "지금 거신 전화는 전원이 꺼져 있어 음성사서함으로 연결됩니다." } },
-      note: "Book club"
-    },
-    {
-      name: "Unknown", phone: "02-555-0132",
-      delivered: false
+      en: 
+      {
+        name: "Gio", phone: "010-2847-1193",
+        replies: ["Where are you?", "Please answer me."]
+      },
+      ko:
+      {
+        name: "지오", phone: "010-2847-1193",
+        replies: ["어디십니까?","대답해주세요."]
+      },
+      en: 
+      {
+        name: "Gio", phone: "010-2847-1193",
+        replies: ["Where are you?", "Please answer me."]
+      },
+      ko:
+      {
+        name: "지오", phone: "010-2847-1193",
+        replies: ["어디십니까?","대답해주세요."]
+      }
     }
   ],
 
