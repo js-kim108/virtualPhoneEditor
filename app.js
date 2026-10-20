@@ -33,7 +33,11 @@
     "H:": "최고:", "L:": "최저:", "Seoul": "서울",
     "Sunny": "맑음", "Clear": "맑음", "Partly Cloudy": "구름 조금", "Cloudy": "흐림", "Rain": "비", "Snow": "눈", "Thunderstorms": "뇌우",
     "Can't Open {n}": "'{n}' 앱을 열 수 없음", "This app isn't part of the story.": "이 앱은 이야기에 포함되어 있지 않습니다.",
-    "OK": "확인", "Back": "뒤로", "Nothing here.": "내용 없음", "Language": "언어"
+    "OK": "확인", "Back": "뒤로", "Nothing here.": "내용 없음", "Language": "언어",
+    "My Card": "내 카드", "No contacts.": "연락처 없음", "message": "메시지", "call": "전화", "video": "영상", "mail": "메일",
+    "mobile": "휴대전화", "notes": "메모", "Calling…": "발신 중…", "No Answer": "응답 없음", "Call Ended": "통화 종료",
+    "Not Delivered": "전송되지 않음", "Send": "보내기", "End": "종료",
+    "mute": "소리 끔", "keypad": "키패드", "speaker": "스피커", "add call": "통화 추가", "FaceTime": "FaceTime", "contacts": "연락처"
   };
 
   function T(s, n) {
@@ -223,6 +227,8 @@
   // the app icon badge and the lock-screen notification disappear.
   // (Remembered until the page is reloaded.)
   var READ = {};
+  // Missed calls count as checked once the reader opens the Phone app's Recents
+  var CALLS_SEEN = false;
 
   function unread(kind, i) {
     var t = (D[kind] || [])[i];
@@ -231,6 +237,126 @@
 
   function unreadTotal(kind) {
     return (D[kind] || []).reduce(function (n, t, i) { return n + unread(kind, i); }, 0);
+  }
+
+  // ---------- contacts ----------
+  // From `contacts` in data.js. Without that list, everyone who appears in
+  // calls, messages and chats is a contact.
+  var NOT_A_CONTACT = ["Unknown", "알 수 없음", "발신자 정보 없음"];
+
+  function contacts() {
+    if (D.contacts) return D.contacts.filter(function (c) { return c && c.name; });
+    var seen = {}, out = [];
+    function add(name) {
+      if (!name || seen[name] || NOT_A_CONTACT.indexOf(name) >= 0) return;
+      seen[name] = 1;
+      out.push({ name: name });
+    }
+    (D.calls || []).forEach(function (c) { add(c.name); });
+    (D.messages || []).forEach(function (t) { if (!t.group) add(t.name); });
+    (D.chats || []).forEach(function (t) { if (!t.group) add(t.name); });
+    return out;
+  }
+
+  function contactIndex(name) {
+    var list = contacts();
+    for (var i = 0; i < list.length; i++) if (list[i].name === name) return i;
+    return -1;
+  }
+
+  function contactFor(name) { return contacts()[contactIndex(name)] || null; }
+
+  // Section letter for the contacts list (Korean names group by first consonant: ㄱ, ㄴ, ㄷ…)
+  function sectionLetter(name) {
+    var ch = Array.from(String(name || "").trim())[0] || "#";
+    var code = ch.charCodeAt(0);
+    if (code >= 0xAC00 && code <= 0xD7A3) {
+      var cho = "ㄱㄲㄴㄷㄸㄹㅁㅂㅃㅅㅆㅇㅈㅉㅊㅋㅌㅍㅎ".charAt(Math.floor((code - 0xAC00) / 588));
+      return { "ㄲ": "ㄱ", "ㄸ": "ㄷ", "ㅃ": "ㅂ", "ㅆ": "ㅅ", "ㅉ": "ㅈ" }[cho] || cho;
+    }
+    return /[a-z]/i.test(ch) ? ch.toUpperCase() : "#";
+  }
+
+  // ---------- conversations, including ones the reader starts ----------
+  var NEW_THREADS = [];   // contacts the reader started a new Messages conversation with
+  var SENT = {};          // "messages:0" -> messages the reader sent, and the replies
+  var NEXT_REPLY = {};    // "messages:0" -> which reply comes next
+  var TYPING = {};        // "messages:0" -> true while the other person is "typing"
+
+  function allThreads(kind) {
+    var list = (D[kind] || []).slice();
+    if (kind === "messages") {
+      NEW_THREADS.forEach(function (ci) {
+        var c = contacts()[ci];
+        if (c) list.push({ name: c.name, thread: [] });
+      });
+    }
+    return list;
+  }
+
+  // A conversation with everything the reader added to it
+  function convo(key) {
+    var p = String(key).split(":");
+    var t = allThreads(p[0])[+p[1]] || { name: "", thread: [] };
+    var c = contactFor(t.name) || {};
+    return {
+      key: key, kind: p[0], name: t.name, group: t.group,
+      avatar: t.avatar || c.photo,
+      thread: (t.thread || []).concat(SENT[key] || []),
+      replies: t.replies || c.replies || [],
+      failed: p[0] === "messages" && (t.delivered === false || c.delivered === false)
+    };
+  }
+
+  function messageContact(ci) {
+    var c = contacts()[ci];
+    if (!c) return;
+    var list = allThreads("messages");
+    for (var i = 0; i < list.length; i++) {
+      if (list[i].name === c.name && !list[i].group) return go("thread", "messages:" + i);
+    }
+    NEW_THREADS.push(ci);
+    go("thread", "messages:" + list.length);
+  }
+
+  function sendMessage(key, text) {
+    var cv = convo(key);
+    (SENT[key] = SENT[key] || []).push({ from: "me", text: text, time: clock(), failed: cv.failed });
+    refreshThread(key);
+    if (cv.failed) return;
+
+    // the next scripted reply, if there is one
+    var n = NEXT_REPLY[key] || 0;
+    var r = cv.replies[n];
+    if (r == null) return;
+    NEXT_REPLY[key] = n + 1;
+    var replyText = typeof r === "object" ? r.text : r;
+    var from = typeof r === "object" && r.from ? r.from
+      : cv.group ? lastSender(cv) : cv.kind === "chats" ? cv.name : "them";
+    setTimeout(function () { TYPING[key] = true; refreshThread(key); }, 900);
+    setTimeout(function () {
+      TYPING[key] = false;
+      SENT[key].push({ from: from, text: replyText, time: clock() });
+      refreshThread(key);
+    }, 2300 + Math.min(2500, String(replyText).length * 45));
+  }
+
+  function lastSender(cv) {
+    for (var i = cv.thread.length - 1; i >= 0; i--) if (cv.thread[i].from !== "me") return cv.thread[i].from;
+    return cv.name;
+  }
+
+  // Redraw just the bubbles of an open conversation (keeps the keyboard open)
+  function refreshThread(key) {
+    var page = currentPage();
+    if (!page || page._name !== "thread" || page._arg !== key) return;
+    var cv = convo(key);
+    var box = page.querySelector(".bubbles");
+    var tmp = document.createElement("div");
+    tmp.innerHTML = bubbles(cv, cv.kind === "chats");
+    box.parentNode.replaceChild(tmp.firstChild, box);
+    var body = page.querySelector(".app-body");
+    body.scrollTop = body.scrollHeight;
   }
 
   function empty(text) { return '<p class="empty">' + esc(text || T("Nothing here.")) + "</p>"; }
@@ -261,6 +387,13 @@
       return [5, 12, 19].map(function (x) { return '<circle cx="' + x + '" cy="' + y + '" r="2.4" fill="currentColor"/>'; }).join("");
     }).join("")),
     vm: svg('<circle cx="6.5" cy="12" r="4" fill="none" stroke="currentColor" stroke-width="2.2"/><circle cx="17.5" cy="12" r="4" fill="none" stroke="currentColor" stroke-width="2.2"/><path d="M6.5 16h11" stroke="currentColor" stroke-width="2.2"/>'),
+    bubble: svg('<path fill="currentColor" d="M12 3.5c-5.25 0-9.5 3.4-9.5 7.6 0 2.35 1.33 4.45 3.42 5.85-.2 1.2-.85 2.4-1.9 3.3 2.05.05 3.75-.75 4.85-1.75.99.23 2.04.35 3.13.35 5.25 0 9.5-3.4 9.5-7.75S17.25 3.5 12 3.5z"/>'),
+    video: svg('<rect x="2.5" y="6" width="13" height="12" rx="3" fill="currentColor"/><path d="m16.5 10.5 5-3v9l-5-3z" fill="currentColor"/>'),
+    mail: svg('<rect x="2.5" y="5.5" width="19" height="13" rx="2.5" fill="currentColor"/><path d="M3.5 7 12 13l8.5-6" fill="none" stroke="#fff" stroke-width="1.6" stroke-linejoin="round" opacity=".9"/>'),
+    mic: svg('<rect x="9" y="3" width="6" height="11" rx="3" fill="currentColor"/><path d="M6 11a6 6 0 0 0 12 0M12 17v4" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><path d="M4 4l16 16" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>'),
+    speaker: svg('<path fill="currentColor" d="M4 9h3.5L12 5v14l-4.5-4H4z"/><path d="M15 9a4 4 0 0 1 0 6M17.5 6.5a7.5 7.5 0 0 1 0 11" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>'),
+    user: svg('<circle cx="12" cy="8" r="4.2" fill="currentColor"/><path d="M3.8 21a8.2 8.2 0 0 1 16.4 0z" fill="currentColor"/>'),
+    send: svg('<circle cx="12" cy="12" r="12" fill="currentColor"/><path d="M12 17.5V7M7.5 11.2 12 6.7l4.5 4.5" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>'),
     globe: svg('<circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M3 12h18M12 3c2.6 2.5 3.9 5.5 3.9 9s-1.3 6.5-3.9 9c-2.6-2.5-3.9-5.5-3.9-9S9.4 5.5 12 3z" fill="none" stroke="currentColor" stroke-width="1.6"/>', null, "globe"),
     lock: svg('<rect x="5" y="10.5" width="14" height="10" rx="2.5" fill="currentColor"/><path d="M8 10.5V8a4 4 0 0 1 8 0v2.5" fill="none" stroke="currentColor" stroke-width="2"/>'),
     flash: svg('<path d="M6.5 2h11v2.5l-2.5 4.5H9L6.5 4.5z" fill="currentColor"/><path d="M9 10h6v10a2 2 0 0 1-2 2h-2a2 2 0 0 1-2-2z" fill="currentColor"/><circle cx="12" cy="14" r="1.3" fill="rgba(0,0,0,.45)"/>'),
@@ -309,7 +442,7 @@
   // ============================================================
   var APPS = {
     calls: { label: "Phone", view: "calls", bg: "linear-gradient(#5ef07c,#1db73c)", glyph: G.phone,
-      badge: function () { return (D.calls || []).filter(function (c) { return c.type === "missed"; }).length; } },
+      badge: function () { return CALLS_SEEN ? 0 : (D.calls || []).filter(function (c) { return c.type === "missed"; }).length; } },
     search: { label: "Search", view: "search", bg: "linear-gradient(#6cb7ff,#1867f2)", glyph: G.search },
     messages: { label: "Messages", view: "messages", bg: "linear-gradient(#7ad7ff,#1d95ee)", glyph: G.bubble,
       badge: function () { return unreadTotal("messages"); } },
@@ -399,7 +532,7 @@
       });
     });
     (D.calls || []).forEach(function (c) {
-      if (c.type !== "missed") return;
+      if (c.type !== "missed" || CALLS_SEEN) return;
       out.push({
         app: "calls", title: T("Missed Call"), time: c.time,
         body: c.name + (c.count > 1 ? " (" + c.count + ")" : ""),
@@ -436,19 +569,32 @@
       } else {
         if (stamp[i]) html += '<div class="t-stamp">' + esc(m.time) + "</div>";
         html += name + '<div class="msg-row' + (me ? " me" : "") + (first ? " first" : "") + (last ? " tail" : "") +
-          '"><div class="bubble">' + esc(m.text) + "</div></div>";
+          (m.failed ? " failed" : "") + '"><div class="bubble">' + esc(m.text) + "</div>" +
+          (m.failed ? '<span class="fail-ic">!</span>' : "") + "</div>";
       }
     });
     var end = msgs[msgs.length - 1];
-    if (!kt && end && end.from === "me") html += '<div class="receipt">' + T("Delivered") + '</div>';
+    if (!kt && end && end.from === "me") {
+      html += end.failed ? '<div class="receipt failed">' + T("Not Delivered") + "</div>" : '<div class="receipt">' + T("Delivered") + "</div>";
+    }
+    // "…" while the other person is typing a reply
+    if (t.key && TYPING[t.key]) {
+      var dots = '<div class="bubble"><i></i><i></i><i></i></div>';
+      html += kt
+        ? '<div class="kt-row first typing">' + avatar(t.group ? lastSender(t) : t.name, t.group ? null : t.avatar, "sq") +
+          '<div class="kt-col"><div class="kt-line">' + dots + "</div></div></div>"
+        : '<div class="msg-row first tail typing">' + dots + "</div>";
+    }
     return '<div class="bubbles">' + html + "</div>";
   }
 
-  function threadRows(list, kind) {
+  function threadRows(kind) {
     var kt = kind === "chats";
-    if (!list || !list.length) return empty();
-    return '<ul class="tlist' + (kt ? " kt" : "") + '">' + list.map(function (t, i) {
-      var last = (t.thread && t.thread[t.thread.length - 1]) || {};
+    var list = allThreads(kind);
+    if (!list.length) return empty();
+    return '<ul class="tlist' + (kt ? " kt" : "") + '">' + list.map(function (src, i) {
+      var t = convo(kind + ":" + i);
+      var last = t.thread[t.thread.length - 1] || {};
       var u = unread(kind, i);
       return '<li><button class="trow' + (u ? " is-unread" : "") + '" type="button" data-go="thread" data-arg="' + kind + ":" + i + '">' +
         (kt ? "" : '<span class="udot' + (u ? " on" : "") + '"></span>') +
@@ -458,6 +604,17 @@
         '<span class="t-prev"><span class="t-prev-txt">' + esc(last.text) + "</span>" +
         (kt && u ? '<span class="kt-badge">' + (u > 300 ? "300+" : u) + "</span>" : "") + "</span></span></button></li>";
     }).join("") + "</ul>";
+  }
+
+  // Phone app tab bar: Recents and Contacts switch screens
+  function phoneTabs(active) {
+    var tabs = [["Favorites", I.star], ["Recents", I.clock, "calls", ""], ["Contacts", I.person, "contacts", "tab"],
+      ["Keypad", I.keypad], ["Voicemail", I.vm]];
+    return '<nav class="tabbar">' + tabs.map(function (t) {
+      return '<button type="button" class="tab' + (t[0] === active ? " on" : "") + '"' +
+        (t[2] && t[0] !== active ? ' data-swap="' + t[2] + '" data-arg="' + t[3] + '"' : "") + ">" +
+        t[1] + "<small>" + T(t[0]) + "</small></button>";
+    }).join("") + "</nav>";
   }
 
   function searchField(text, filled) {
@@ -572,24 +729,67 @@
       };
     },
 
+    // Phone app: Recents. Tap a call to call back, tap (i) to see the contact.
     calls: function (arg) {
+      CALLS_SEEN = true; // looking at Recents clears the missed-call badge and notifications
       var missedOnly = arg === "missed";
-      var list = (D.calls || []).filter(function (c) { return !missedOnly || c.type === "missed"; });
-      var tabs = [["Favorites", I.star], ["Recents", I.clock, 1], ["Contacts", I.person], ["Keypad", I.keypad], ["Voicemail", I.vm]];
+      var list = MY_CALLS.concat(D.calls || []).filter(function (c) { return !missedOnly || c.type === "missed"; });
       return {
         title: T("Recents"), large: true,
         navCenter: '<div class="seg"><button type="button" data-swap="calls" data-arg=""' + (missedOnly ? "" : ' class="on"') + '>' + T("All") + '</button>' +
           '<button type="button" data-swap="calls" data-arg="missed"' + (missedOnly ? ' class="on"' : "") + ">" + T("Missed") + "</button></div>",
         navRight: '<span class="nav-btn">' + T("Edit") + '</span>',
         html: list.length ? '<ul class="clist">' + list.map(function (c) {
+          var ci = contactIndex(c.name);
           return '<li class="crow ' + esc(c.type) + '"><span class="call-dir">' + (c.type === "outgoing" ? I.phone : "") + "</span>" +
-            '<span class="c-wrap"><span class="c-text"><span class="c-name">' + esc(c.name) + (c.count > 1 ? " (" + c.count + ")" : "") + "</span>" +
+            '<span class="c-wrap"><button class="c-main" type="button" data-call="' + esc(c.name) + '"><span class="c-text"><span class="c-name">' +
+            esc(c.name) + (c.count > 1 ? " (" + c.count + ")" : "") + "</span>" +
             '<span class="c-sub">' + esc(T(CALL_LABEL[c.type] || c.type)) + (c.duration ? " · " + esc(c.duration) : "") + "</span></span>" +
-            '<span class="c-time">' + esc(c.time) + '</span><span class="info">' + I.info + "</span></span></li>";
+            '<span class="c-time">' + esc(c.time) + "</span></button>" +
+            (ci >= 0 ? '<button class="info" type="button" data-go="contact" data-arg="' + ci + '" aria-label="' + esc(c.name) + '">' + I.info + "</button>"
+              : '<span class="info">' + I.info + "</span>") + "</span></li>";
         }).join("") + "</ul>" : empty(T(missedOnly ? "No missed calls." : "No recent calls.")),
-        foot: '<nav class="tabbar">' + tabs.map(function (t) {
-          return '<span class="tab' + (t[2] ? " on" : "") + '">' + t[1] + "<small>" + T(t[0]) + "</small></span>";
-        }).join("") + "</nav>"
+        foot: phoneTabs("Recents")
+      };
+    },
+
+    // Contacts (Phone app tab, or the new-message button in Messages)
+    contacts: function (arg) {
+      var list = contacts().map(function (c, i) { return { c: c, i: i }; });
+      list.sort(function (a, b) { return String(a.c.name).localeCompare(String(b.c.name), LANG); });
+      var letter = "";
+      var rows = list.map(function (x) {
+        var l = sectionLetter(x.c.name);
+        var head = l !== letter ? '<li class="ct-letter">' + esc(l) + "</li>" : "";
+        letter = l;
+        return head + '<li><button class="ct-row" type="button" data-go="contact" data-arg="' + x.i + '">' + esc(x.c.name) + "</button></li>";
+      }).join("");
+      var me = owner.name ? '<div class="my-card">' + avatar(owner.name, owner.photo) + "<span><b>" + esc(owner.name) +
+        "</b><small>" + esc(T("My Card")) + "</small></span></div>" : "";
+      return {
+        title: T("Contacts"), large: true,
+        html: searchField(T("Search")) + me + (list.length ? '<ul class="ct-list">' + rows + "</ul>" : empty(T("No contacts."))),
+        foot: arg === "tab" ? phoneTabs("Contacts") : null
+      };
+    },
+
+    // One person: message and call buttons, phone number, notes
+    contact: function (ci) {
+      var c = contacts()[+ci] || { name: "" };
+      function act(icon, label, attrs) {
+        return attrs
+          ? '<button type="button" class="cc-act" ' + attrs + ">" + icon + "<small>" + esc(T(label)) + "</small></button>"
+          : '<span class="cc-act off">' + icon + "<small>" + esc(T(label)) + "</small></span>";
+      }
+      return {
+        title: "", short: c.name, cls: "grouped contact-card",
+        navRight: '<span class="nav-btn">' + T("Edit") + "</span>",
+        html: '<div class="cc-head">' + avatar(c.name, c.photo, "big") + "<h2>" + esc(c.name) + "</h2></div>" +
+          '<div class="cc-acts">' + act(I.bubble, "message", 'data-msg="' + (+ci) + '"') + act(I.phone, "call", 'data-call="' + esc(c.name) + '"') +
+          act(I.video, "video") + act(I.mail, "mail") + "</div>" +
+          (c.phone ? '<div class="card cc-field"><small>' + esc(T("mobile")) + '</small><button type="button" data-call="' + esc(c.name) + '">' +
+            esc(c.phone) + "</button></div>" : "") +
+          (c.note ? '<div class="card cc-field"><small>' + esc(T("notes")) + "</small><span>" + esc(c.note) + "</span></div>" : "")
       };
     },
 
@@ -623,8 +823,8 @@
       return {
         title: T("Messages"), large: true,
         navLeft: '<span class="nav-btn">' + T("Edit") + '</span>',
-        navRight: '<span class="nav-btn">' + I.compose + "</span>",
-        html: searchField(T("Search")) + threadRows(D.messages, "messages")
+        navRight: '<button class="nav-btn" type="button" data-go="contacts" aria-label="' + esc(T("Contacts")) + '">' + I.compose + "</button>",
+        html: searchField(T("Search")) + threadRows("messages")
       };
     },
 
@@ -633,24 +833,31 @@
         title: "", short: T("Chats"), cls: "kt-list",
         navLeft: '<span class="kt-title">' + T("Chats") + '</span>',
         navRight: '<span class="nav-btn dark">' + I.mag + "</span>",
-        html: threadRows(D.chats, "chats")
+        html: threadRows("chats")
       };
     },
 
+    // A conversation. The reader can type and send messages; replies come from data.js.
     thread: function (arg) {
       READ[arg] = true; // opening a conversation marks it as read
-      var parts = String(arg).split(":");
-      var kind = parts[0];
-      var t = (D[kind] || [])[+parts[1]] || { name: "", thread: [] };
-      var kt = kind === "chats";
+      var t = convo(arg);
+      var kt = t.kind === "chats";
+      var ci = contactIndex(t.name);
+      var head = avatar(t.name, t.avatar) + '<span class="nc-name">' + esc(t.name) + " " + I.chevR + "</span>";
       return {
         title: t.name,
         cls: kt ? "kt-thread" : "imsg",
-        navCenter: kt ? null : '<div class="nav-contact">' + avatar(t.name, t.avatar) + '<span class="nc-name">' + esc(t.name) + " " + I.chevR + "</span></div>",
+        navCenter: kt ? null : ci >= 0
+          ? '<button class="nav-contact" type="button" data-go="contact" data-arg="' + ci + '">' + head + "</button>"
+          : '<div class="nav-contact">' + head + "</div>",
+        navRight: t.group ? "" : '<button class="nav-btn' + (kt ? " dark" : "") + '" type="button" data-call="' + esc(t.name) + '" aria-label="' +
+          esc(T("call")) + '">' + I.phone + "</button>",
         html: bubbles(t, kt),
-        foot: kt
-          ? '<div class="composer kt"><span class="c-plus">' + I.plus + '</span><span class="c-field"></span><span class="c-send">#</span></div>'
-          : '<div class="composer"><span class="c-plus">' + I.plus + '</span><span class="c-field">' + T("Text Message") + '</span></div>',
+        foot: '<form class="composer' + (kt ? " kt" : "") + '" data-send="' + esc(arg) + '">' +
+          '<span class="c-plus">' + I.plus + "</span>" +
+          '<input class="c-input" type="text" autocomplete="off" enterkeyhint="send" placeholder="' + (kt ? "" : esc(T("Text Message"))) +
+          '" aria-label="' + esc(T("Text Message")) + '">' +
+          '<button class="c-send-btn" type="submit" aria-label="' + esc(T("Send")) + '">' + I.send + "</button></form>",
         after: function (body) { body.scrollTop = body.scrollHeight; }
       };
     },
@@ -803,6 +1010,7 @@
       (v.large ? '<h1 class="large-title">' + esc(v.title) + "</h1>" : "") + v.html + "</div>" + (v.foot || "");
     page._v = v;
     page._name = entry[0];
+    page._arg = entry[1];
     screen.insertBefore(page, before || null);
 
     var body = page.querySelector(".app-body");
@@ -822,6 +1030,7 @@
   }
 
   function goHome() {
+    if (callNow) return; // finish or end the call first
     if (topName() === "lock") return unlock();
     if (topName() === "home") return;
     stack = [["home"]];
@@ -851,7 +1060,90 @@
     if (location.hash !== "#phone") history.replaceState(null, "", "#phone");
   }
 
+  // ============================================================
+  //  phone calls
+  //  `call` on a contact in data.js decides what happens:
+  //    call: { answer: true, lines: ["Hello?", "..."] }   they pick up and say these lines
+  //    call: { message: "The number you dialed..." }      a recorded message plays
+  //    (nothing)                                          it rings, then "No Answer"
+  // ============================================================
+  var MY_CALLS = [];   // calls the reader made (shown at the top of Recents)
+  var callNow = null;
+
+  function mmss(ms) {
+    var s = Math.floor(ms / 1000);
+    return String(Math.floor(s / 60)).padStart(2, "0") + ":" + String(s % 60).padStart(2, "0");
+  }
+
+  function startCall(name) {
+    if (callNow || !name) return;
+    var c = contactFor(name) || { name: name };
+    var plan = c.call || {};
+    var rec = { name: c.name, type: "outgoing", time: clock() };
+    MY_CALLS.unshift(rec);
+
+    var el = document.createElement("div");
+    el.className = "call-screen";
+    el.innerHTML = '<div class="cs-head">' + avatar(c.name, c.photo, "big") + '<div class="cs-name">' + esc(c.name) + "</div>" +
+      '<div class="cs-status">' + esc(T("Calling…")) + "</div></div>" +
+      '<div class="cs-lines" aria-live="polite"></div>' +
+      '<div class="cs-pad">' + [[I.mic, "mute"], [I.keypad, "keypad"], [I.speaker, "speaker"], [I.plus, "add call"], [I.video, "FaceTime"], [I.user, "contacts"]]
+        .map(function (b) { return '<span class="cs-btn"><span>' + b[0] + "</span><small>" + esc(T(b[1])) + "</small></span>"; }).join("") + "</div>" +
+      '<button class="cs-end" type="button" aria-label="' + esc(T("End")) + '">' + I.phone + "</button>";
+    display.appendChild(el);
+    display.classList.add("in-call");
+
+    var status = el.querySelector(".cs-status");
+    var lines = el.querySelector(".cs-lines");
+    var cn = callNow = { el: el, rec: rec, timers: [], start: 0, tick: null };
+    el.querySelector(".cs-end").addEventListener("click", function () { endCall(); });
+
+    function later(ms, fn) { cn.timers.push(setTimeout(fn, ms)); }
+    function say(text) {
+      var p = document.createElement("p");
+      p.textContent = text;
+      lines.appendChild(p);
+      while (lines.children.length > 3) lines.removeChild(lines.firstChild);
+    }
+
+    if (plan.answer) {
+      var script = (plan.lines || []).map(function (l) { return typeof l === "object" ? l.text : l; });
+      later(2600, function () {
+        cn.start = Date.now();
+        var tick = function () { status.textContent = mmss(Date.now() - cn.start); };
+        tick();
+        cn.tick = setInterval(tick, 1000);
+        script.forEach(function (line, i) { later(900 + i * 2600, function () { say(line); }); });
+        later(900 + script.length * 2600 + 1200, function () { endCall(); });
+      });
+    } else if (plan.message) {
+      later(2400, function () { say(plan.message); });
+      later(2400 + 2000 + Math.min(6000, String(plan.message).length * 60), function () { endCall(); });
+    } else {
+      later(6000, function () { status.textContent = T("No Answer"); });
+      later(7600, function () { endCall("keep"); });
+    }
+  }
+
+  // mode: "keep" = keep the current status text, "now" = close immediately
+  function endCall(mode) {
+    var cn = callNow;
+    if (!cn) return;
+    callNow = null;
+    cn.timers.forEach(clearTimeout);
+    clearInterval(cn.tick);
+    if (cn.start) cn.rec.duration = mmss(Date.now() - cn.start).replace(/^0(?=\d:)/, "");
+    if (mode !== "keep") cn.el.querySelector(".cs-status").textContent = T("Call Ended");
+    cn.el.classList.add("ending");
+    setTimeout(function () {
+      cn.el.remove();
+      display.classList.remove("in-call");
+      if (topName() === "calls") draw(""); // show the new call in Recents
+    }, mode === "now" ? 0 : 900);
+  }
+
   function closePhone() {
+    endCall("now");
     overlay.hidden = true;
     document.body.classList.remove("locked");
     history.replaceState(null, "", location.pathname + location.search);
@@ -926,7 +1218,27 @@
       stack[stack.length - 1] = [el.getAttribute("data-swap"), el.getAttribute("data-arg")];
       return draw("");
     }
+    if ((el = t.closest("[data-call]"))) return startCall(el.getAttribute("data-call"));
+    if ((el = t.closest("[data-msg]"))) return messageContact(+el.getAttribute("data-msg"));
     if ((el = t.closest("[data-go]"))) go(el.getAttribute("data-go"), el.getAttribute("data-arg"));
+  });
+
+  // Sending a message from the message box
+  screen.addEventListener("submit", function (e) {
+    e.preventDefault();
+    var form = e.target.closest("[data-send]");
+    if (!form) return;
+    var input = form.querySelector(".c-input");
+    var text = input.value.trim();
+    if (!text) return;
+    input.value = "";
+    form.classList.remove("has-text");
+    sendMessage(form.getAttribute("data-send"), text);
+    input.focus();
+  });
+  screen.addEventListener("input", function (e) {
+    var form = e.target.closest("[data-send]");
+    if (form) form.classList.toggle("has-text", !!e.target.value.trim());
   });
 
   // ============================================================
@@ -1082,6 +1394,7 @@
   overlay.addEventListener("click", function (e) { if (e.target === overlay) closePhone(); });
   document.addEventListener("keydown", function (e) {
     if (overlay.hidden || busy) return;
+    if (e.target.closest && e.target.closest("input") && e.key !== "Escape") return; // typing a message
     if (e.key === "ArrowLeft" || e.key === "ArrowRight") {
       var page = currentPage();
       var h = page && page.querySelector(".hscroll");
@@ -1089,6 +1402,7 @@
       return;
     }
     if (e.key !== "Escape") return;
+    if (callNow) return endCall();
     if (document.querySelector(".alert-wrap")) return document.querySelector(".alert-wrap").remove();
     if (topName() === "lock") return closePhone();
     back();
