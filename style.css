@@ -23,6 +23,25 @@ body.locked { overflow: hidden; }
 }
 .phone-link::before { content: "📱 "; }
 
+/* Language picker under the story */
+.lang {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 10px 14px;
+  margin-top: 28px; padding-top: 20px; border-top: 1px solid rgba(31, 29, 26, .12);
+  font: 15px/1.4 -apple-system, BlinkMacSystemFont, "Inter", "Apple SD Gothic Neo", "Noto Sans KR", "Segoe UI", sans-serif;
+  color: #6b665e;
+}
+.lang[hidden] { display: none; }
+.lang-label { display: inline-flex; align-items: center; gap: 6px; }
+.globe { width: 17px; height: 17px; }
+.lang-seg { display: inline-flex; padding: 3px; border-radius: 10px; background: rgba(31, 29, 26, .07); }
+.lang-seg button {
+  padding: 6px 16px; border: 0; border-radius: 8px; background: none;
+  font: inherit; color: #4a463f; cursor: pointer; transition: background .15s;
+}
+.lang-seg button:hover { color: var(--ink); }
+.lang-seg button.on { background: #fff; color: var(--ink); font-weight: 600; box-shadow: 0 1px 3px rgba(0, 0, 0, .12); }
+.lang-seg button:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+
 /* ============================================================
    Overlay
    ============================================================ */
@@ -253,6 +272,111 @@ body.locked { overflow: hidden; }
   background: rgba(255, 255, 255, .26);
   -webkit-backdrop-filter: blur(26px) saturate(1.6); backdrop-filter: blur(26px) saturate(1.6);
 }
+
+/* ============================================================
+   Widgets (home screen page 1)
+   ============================================================ */
+.widgets { height: 100%; display: flex; flex-direction: column; gap: 14px; padding: 14px 22px 6px; overflow: hidden; color: #fff; }
+.wgt { display: flex; flex-direction: column; align-items: center; gap: 6px; min-height: 0; flex: none; }
+.wgt.grow { flex: 0 1 auto; }
+.widget {
+  display: flex; flex-direction: column; width: 100%; min-height: 0;
+  padding: 14px 16px; border: 0; border-radius: 22px; overflow: hidden;
+  text-align: left; color: #fff; cursor: pointer;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, .18);
+  transition: transform .15s;
+}
+.widget:active { transform: scale(.97); }
+.widget span, .widget b { display: block; }
+.wi { display: block; }
+
+/* Weather backgrounds by condition */
+.wbg-sun    { --wbg: linear-gradient(180deg, #2f7fe0, #64aef5); }
+.wbg-moon   { --wbg: linear-gradient(180deg, #0c1636, #2a3a6b); }
+.wbg-partly { --wbg: linear-gradient(180deg, #3d7fd1, #82a9d6); }
+.wbg-cloud  { --wbg: linear-gradient(180deg, #59677c, #8b97a8); }
+.wbg-rain   { --wbg: linear-gradient(180deg, #3b4656, #5d6b7e); }
+.wbg-snow   { --wbg: linear-gradient(180deg, #6d87a6, #a4b8cf); }
+.wbg-storm  { --wbg: linear-gradient(180deg, #1f2129, #454857); }
+
+.w-weather { background: var(--wbg); }
+.ww-top { display: flex !important; justify-content: space-between; align-items: flex-start; }
+.ww-city { font-size: 15px; font-weight: 600; }
+.ww-temp { font-size: 46px; font-weight: 300; line-height: 1.05; letter-spacing: -1px; }
+.ww-right { display: flex !important; flex-direction: column; align-items: flex-end; font-size: 13px; font-weight: 600; line-height: 1.3; }
+.ww-right .wi { width: 22px; height: 22px; margin-bottom: 4px; }
+.ww-hours { display: grid !important; grid-template-columns: repeat(6, 1fr); margin-top: 10px; text-align: center; font-size: 12px; font-weight: 600; }
+.ww-h { display: flex !important; flex-direction: column; align-items: center; gap: 4px; }
+.ww-h > span { opacity: .85; }
+.ww-h .wi { width: 20px; height: 20px; }
+
+.w-cal { background: #fff; color: #000; }
+.wc-top { display: flex !important; gap: 14px; flex: none; }
+.wc-date { flex: none; width: 96px; }
+.wc-wd { color: #ff3b30; font-size: 13px; font-weight: 700; text-transform: uppercase; }
+.wc-day { font-size: 44px; font-weight: 400; line-height: 1.05; }
+.wc-month { flex: 1; min-width: 0; }
+.wc-mname { color: #ff3b30; font-size: 11px; font-weight: 700; text-transform: uppercase; margin-bottom: 3px; }
+.mgrid { display: grid !important; grid-template-columns: repeat(7, 1fr); row-gap: 2px; text-align: center; font-size: 10.5px; font-weight: 600; }
+.mgrid b { color: rgba(60, 60, 67, .6); font-weight: 600; }
+.mgrid i { display: block; height: 17px; line-height: 17px; font-style: normal; }
+.mgrid i.today { width: 17px; margin: 0 auto; border-radius: 50%; background: #ff3b30; color: #fff; }
+.wc-events { margin-top: 12px; min-height: 0; overflow: hidden; }
+.wc-ev { margin-top: 8px; padding-left: 9px; border-left: 3px solid var(--c); }
+.wc-ev:first-child { margin-top: 0; }
+.wc-ev b { font-size: 14px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.wc-ev span { font-size: 12px; color: rgba(60, 60, 67, .6); }
+.wc-none { font-size: 13px; color: rgba(60, 60, 67, .6); }
+
+/* ============================================================
+   Calendar app
+   ============================================================ */
+.cal-app { --tint: #ff3b30; }
+.cal-month { padding: 4px 8px 8px; border-bottom: .5px solid var(--sep); }
+.cal-month .mgrid { row-gap: 6px; font-size: 17px; font-weight: 400; }
+.cal-month .mgrid b { font-size: 12px; }
+.cal-month .mgrid i { height: 34px; line-height: 34px; }
+.cal-month .mgrid i.today { width: 34px; font-weight: 600; }
+.cal-list { list-style: none; margin: 0; padding: 0; }
+.cal-list li { display: flex; align-items: center; gap: 12px; padding: 10px 16px; border-bottom: .5px solid var(--sep); }
+.cal-bar { flex: none; width: 4px; align-self: stretch; border-radius: 2px; background: var(--c); }
+.cal-main { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.cal-main b { font-weight: 600; }
+.cal-main span { font-size: 14px; color: var(--label2); }
+.cal-time { flex: none; font-size: 15px; color: var(--label2); }
+
+/* ============================================================
+   Weather app
+   ============================================================ */
+.weather-app { background: var(--wbg); color: #fff; }
+.weather-app .app-body { padding: 0 16px 34px; }
+.wa-head { text-align: center; padding: 26px 0 18px; text-shadow: 0 1px 6px rgba(0, 0, 0, .12); }
+.wa-city { font-size: 32px; font-weight: 500; }
+.wa-temp { font-size: 96px; font-weight: 200; line-height: 1; padding-left: 26px; }
+.wa-cond, .wa-hl { font-size: 20px; font-weight: 500; }
+.wa-hl { white-space: pre; }
+.wa-card {
+  margin-top: 12px; padding: 10px 14px; border-radius: 16px;
+  background: rgba(255, 255, 255, .14);
+  -webkit-backdrop-filter: blur(12px); backdrop-filter: blur(12px);
+}
+.wa-card h3 {
+  margin: 0 0 8px; padding-bottom: 8px; border-bottom: .5px solid rgba(255, 255, 255, .25);
+  font-size: 12px; font-weight: 600; text-transform: uppercase; opacity: .75;
+}
+.wa-hours { display: grid; grid-template-columns: repeat(6, 1fr); text-align: center; font-size: 15px; font-weight: 600; }
+.wa-hours > div { display: flex; flex-direction: column; align-items: center; gap: 8px; }
+.wa-hours .wi { width: 26px; height: 26px; }
+.wa-day {
+  display: grid; grid-template-columns: 62px 28px 38px 1fr 38px; align-items: center; gap: 4px;
+  padding: 9px 0; border-top: .5px solid rgba(255, 255, 255, .2); font-size: 18px; font-weight: 600;
+}
+.wa-day:first-of-type { border-top: 0; }
+.wa-day .wi { width: 24px; height: 24px; }
+.wa-day > b:last-child { text-align: right; }
+.wa-lo { opacity: .6; text-align: right; }
+.wa-bar { position: relative; height: 5px; margin: 0 8px; border-radius: 3px; background: rgba(0, 0, 0, .18); }
+.wa-bar i { position: absolute; top: 0; bottom: 0; border-radius: 3px; background: linear-gradient(90deg, #8fd3ff, #ffd36b); }
 
 /* ============================================================
    Navigation bar
