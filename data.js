@@ -4,24 +4,63 @@
 //  that opens the phone. Images go in the img/ folder and are
 //  written as "img/filename.jpg". Leave src empty for a
 //  colored placeholder.
+//
+//  LANGUAGES: readers can switch between English and 한국어
+//  under the story. Any text can be written in both languages:
+//      title: { en: "The Last Train", ko: "막차" }
+//  Text written only once shows the same in both languages.
+//  (The phone's own buttons and labels switch automatically.)
 // ============================================================
 
 window.PHONE_DATA = {
+  // language: "ko",         // which language to start in (optional)
+  // languagePicker: false,  // hide the language picker under the story
+
   story: {
-    title: "실종",
-    paragraphs: [
-      "[[유성운씨의 폰이다.]]"
-    ]
+    title: { en: "The Last Train", ko: "막차" },
+    paragraphs: {
+      en: [
+        "Seo-yeon left her phone on the café table when she ran for the last train. By the time Jun noticed, the door had already swung shut behind her.",
+        "He picked it up. The screen lit at his touch, no lock. He told himself he would only look for a number to call. [[Open her phone]]",
+        "Ten minutes later he was still reading."
+      ],
+      ko: [
+        "서연은 막차를 타러 뛰어가면서 카페 테이블에 휴대폰을 두고 갔다. 준이 알아챘을 때는 이미 문이 닫힌 뒤였다.",
+        "그는 휴대폰을 집어 들었다. 손이 닿자 화면이 켜졌다. 잠금도 없었다. 연락할 번호만 찾아보겠다고 스스로에게 말했다. [[그녀의 휴대폰 열기]]",
+        "10분이 지나도 그는 여전히 읽고 있었다."
+      ]
+    }
   },
 
   owner: {
-    name: "유성운",
-    time: "05:37",            // leave "" to show the real time
-    date: "금요일, 10월 13일",
-    battery: 21,
+    name: "Seo-yeon",
+    time: "23:47",            // leave "" to show the real time
+    date: { en: "Friday, October 16", ko: "10월 16일 금요일" },
+    battery: 23,
     wallpaper: "",            // e.g. "img/wallpaper.jpg"
     lockScreen: true          // false = skip the lock screen and open on the home screen
   },
+
+  // Weather widget. Everything is optional; leave out what you don't need.
+  // icon: "sun", "moon", "partly", "cloud", "rain", "snow" or "storm"
+  weather: {
+    city: { en: "Seoul", ko: "서울" },
+    temp: 11,
+    icon: "moon",
+    // condition: "Clear",   // leave this out to use the automatic name for the icon (in both languages)
+    high: 17,
+    low: 8
+    // hourly: [ { time: "Now", icon: "moon", temp: 11 }, { time: "0", icon: "cloud", temp: 10 } ],
+    // daily:  [ { day: "Today", icon: "sun", low: 8, high: 17 } ]
+  },
+
+  // Calendar widget and Calendar app (the first 3 show on the home screen)
+  // color is optional, e.g. "#ff3b30" red, "#34c759" green, "#007aff" blue
+  events: [
+    { date: "Today", time: "23:55", title: "Last train to Busan", place: "Seoul Station", color: "#ff3b30" },
+    { date: "Sun, Oct 18", time: "All day", title: "Sign the lease", color: "#007aff" },
+    { date: "Mon, Oct 19", time: "09:00", title: "Movers arrive", place: "Busan", color: "#34c759" }
+  ],
 
   // type: "missed" | "incoming" | "outgoing"
   calls: [
