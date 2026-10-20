@@ -29,9 +29,9 @@ window.PHONE_DATA = {
   },
 
   owner: {
-    name: "Seo-yeon",
-    time: "23:47",            // leave "" to show the real time
-    date: { en: "Friday, October 16", ko: "10월 16일 금요일" },
+    name: "유성운",
+    time: "00:47",            // leave "" to show the real time
+    date: { en: "Friday, October 13", ko: "10월 13일 금요일" },
     battery: 23,
     wallpaper: "",            // e.g. "img/wallpaper.jpg"
     lockScreen: true          // false = skip the lock screen and open on the home screen
