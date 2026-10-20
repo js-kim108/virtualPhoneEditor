@@ -1,8 +1,93 @@
 (function () {
   "use strict";
 
-  var D = window.PHONE_DATA || {};
-  var owner = D.owner || {};
+  // ============================================================
+  //  language
+  //  The reader picks English or 한국어 under the story.
+  //  Any text in data.js can be written in both languages:
+  //    title: { en: "Missing", ko: "실종" }
+  //  Text written only once is shown as-is in both languages.
+  // ============================================================
+  var RAW = window.PHONE_DATA || {};
+  var LANGS = ["en", "ko"];
+  var LANG = "en", D = {}, owner = {};
+
+  // Phone labels in Korean ({n} is replaced by a number or name)
+  var KO = {
+    "Phone": "전화", "Search": "검색", "Messages": "메시지", "Chat": "채팅", "Notes": "메모",
+    "Translate": "번역", "Photos": "사진", "Calendar": "캘린더", "Camera": "카메라", "Clock": "시계",
+    "Weather": "날씨", "Settings": "설정", "Mail": "메일", "Music": "음악", "Maps": "지도", "Books": "도서",
+    "Swipe up to open": "위로 쓸어올려 열기", "Missed Call": "부재중 전화",
+    "{n} more message": "메시지 {n}개 더 보기", "{n} more messages": "메시지 {n}개 더 보기",
+    "Recents": "최근 기록", "All": "전체", "Missed": "부재중", "Edit": "편집",
+    "Favorites": "즐겨찾기", "Contacts": "연락처", "Keypad": "키패드", "Voicemail": "음성 사서함",
+    "Incoming": "수신", "Outgoing": "발신", "No missed calls.": "부재중 전화 없음", "No recent calls.": "최근 통화 없음",
+    "Search or enter website": "검색 또는 웹 사이트 입력", "Recent Searches": "최근 검색", "Clear": "지우기",
+    "No recent searches.": "최근 검색 없음", "Results": "검색 결과", "The page didn't load.": "페이지를 열 수 없습니다.",
+    "Text Message": "문자 메시지", "Delivered": "전송됨", "Chats": "채팅",
+    "No additional text": "추가 텍스트 없음", "{n} Note": "메모 {n}개", "{n} Notes": "메모 {n}개", "Done": "완료",
+    "English": "영어", "Korean": "한국어", "Enter text": "텍스트 입력", "Recent": "최근",
+    "{n} Photo": "사진 {n}장", "{n} Photos": "사진 {n}장", "Photo": "사진",
+    "No events.": "일정 없음", "No upcoming events": "예정된 일정 없음",
+    "Now": "지금", "Today": "오늘", "Hourly Forecast": "시간별 일기예보", "{n}-Day Forecast": "{n}일간의 일기예보",
+    "H:": "최고:", "L:": "최저:", "Seoul": "서울",
+    "Sunny": "맑음", "Clear": "맑음", "Partly Cloudy": "구름 조금", "Cloudy": "흐림", "Rain": "비", "Snow": "눈", "Thunderstorms": "뇌우",
+    "Can't Open {n}": "'{n}' 앱을 열 수 없음", "This app isn't part of the story.": "이 앱은 이야기에 포함되어 있지 않습니다.",
+    "OK": "확인", "Back": "뒤로", "Nothing here.": "내용 없음", "Language": "언어"
+  };
+
+  function T(s, n) {
+    var t = LANG === "ko" && KO[s] != null ? KO[s] : s;
+    return n == null ? t : t.replace("{n}", n);
+  }
+
+  // { en: "...", ko: "..." } -> the text for the chosen language (or whichever one exists)
+  function isLangObj(v) {
+    if (!v || typeof v !== "object" || Array.isArray(v)) return false;
+    var keys = Object.keys(v);
+    return keys.length > 0 && keys.every(function (k) { return LANGS.indexOf(k) >= 0; });
+  }
+  function resolve(v) {
+    if (Array.isArray(v)) return v.map(resolve);
+    if (isLangObj(v)) return resolve(v[LANG] != null ? v[LANG] : v[LANGS.filter(function (l) { return v[l] != null; })[0]]);
+    if (v && typeof v === "object") {
+      var o = {};
+      Object.keys(v).forEach(function (k) { o[k] = resolve(v[k]); });
+      return o;
+    }
+    return v;
+  }
+
+  function setLang(l) {
+    LANG = LANGS.indexOf(l) >= 0 ? l : "en";
+    D = resolve(RAW);
+    owner = D.owner || {};
+    document.documentElement.lang = LANG;
+  }
+
+  // Which language to start in: ?lang=ko in the address, the reader's last choice,
+  // `language` in data.js, Korean if the story is written in Korean, otherwise the browser's language
+  function startLang() {
+    var q = /[?&]lang=(en|ko)\b/.exec(location.search);
+    if (q) return q[1];
+    var saved = null;
+    try { saved = localStorage.getItem("phonePeekLang"); } catch (err) { /* storage blocked */ }
+    if (LANGS.indexOf(saved) >= 0) return saved;
+    var set = RAW.language || (RAW.owner && RAW.owner.language);
+    if (LANGS.indexOf(set) >= 0) return set;
+    if (/[가-힣]/.test(plainText(RAW.story))) return "ko";
+    return /^ko/i.test(navigator.language || "") ? "ko" : "en";
+  }
+
+  // Text written in only one language (skips { en, ko } pairs)
+  function plainText(v) {
+    if (typeof v === "string") return v;
+    if (Array.isArray(v)) return v.map(plainText).join(" ");
+    if (isLangObj(v)) return "";
+    if (v && typeof v === "object") return Object.keys(v).map(function (k) { return plainText(v[k]); }).join(" ");
+    return "";
+  }
+  setLang(startLang());
 
   // ============================================================
   //  helpers
@@ -35,18 +120,109 @@
     return m ? +m[1] * 60 + +m[2] : null;
   }
 
-  function dateParts() {
-    var m = /^\s*([A-Za-z]+),\s*[A-Za-z]+\s+(\d{1,2})/.exec(owner.date || "");
-    if (m) return { wd: m[1], day: m[2] };
-    var d = new Date();
-    return { wd: d.toLocaleDateString("en-US", { weekday: "long" }), day: String(d.getDate()) };
+  // ---------- the phone's date ----------
+  // Reads owner.date, in English ("Friday, October 16") or Korean ("10월 16일 금요일").
+  // If no year is given, it picks the nearest year where that date falls on that weekday.
+  var MONTHS = ["jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "oct", "nov", "dec"];
+
+  function storyDate() {
+    var s = String(owner.date || ""), now = new Date();
+    var m, mon = -1, day = 0, year = 0, wd = -1;
+    if ((m = /(\d{1,2})\s*월\s*(\d{1,2})\s*일/.exec(s))) { mon = +m[1] - 1; day = +m[2]; }
+    else if ((m = /\b(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\.?\s+(\d{1,2})\b/i.exec(s))) {
+      mon = MONTHS.indexOf(m[1].toLowerCase()); day = +m[2];
+    }
+    if ((m = /\b(\d{4})\b/.exec(s))) year = +m[1];
+    if ((m = /([일월화수목금토])요일/.exec(s))) wd = "일월화수목금토".indexOf(m[1]);
+    else if ((m = /\b(sun|mon|tue|wed|thu|fri|sat)/i.exec(s))) wd = ["sun", "mon", "tue", "wed", "thu", "fri", "sat"].indexOf(m[1].toLowerCase());
+    if (mon < 0 || !day) return now;
+    if (!year) {
+      year = now.getFullYear();
+      if (wd >= 0) {
+        for (var k = 0; k < 12; k++) {
+          if (new Date(year - k, mon, day).getDay() === wd) { year -= k; break; }
+          if (new Date(year + k, mon, day).getDay() === wd) { year += k; break; }
+        }
+      }
+    }
+    return new Date(year, mon, day);
+  }
+
+  function fmt(d, opts) { return d.toLocaleDateString(LANG === "ko" ? "ko-KR" : "en-US", opts); }
+
+  function addDays(d, n) { return new Date(d.getFullYear(), d.getMonth(), d.getDate() + n); }
+
+  // Month calendar: weekday letters, then the days, with today circled
+  function monthGrid(d) {
+    var first = new Date(d.getFullYear(), d.getMonth(), 1).getDay();
+    var count = new Date(d.getFullYear(), d.getMonth() + 1, 0).getDate();
+    var html = "";
+    for (var i = 0; i < 7; i++) html += "<b>" + esc(fmt(new Date(2023, 0, 1 + i), { weekday: "narrow" })) + "</b>";
+    for (i = 0; i < first; i++) html += "<i></i>";
+    for (i = 1; i <= count; i++) html += "<i" + (i === d.getDate() ? ' class="today"' : "") + ">" + i + "</i>";
+    return '<span class="mgrid">' + html + "</span>";
+  }
+
+  // ---------- weather (from data.js, with sensible defaults) ----------
+  var CONDITION = { sun: "Sunny", moon: "Clear", partly: "Partly Cloudy", cloud: "Cloudy", rain: "Rain", snow: "Snow", storm: "Thunderstorms" };
+
+  function weather() {
+    var w = D.weather || {};
+    var mins = minutes(clock());
+    var night = mins !== null && (mins < 6 * 60 || mins >= 19 * 60);
+    var icon = CONDITION[w.icon] ? w.icon : (night ? "moon" : "sun");
+    var temp = w.temp != null ? +w.temp : 14;
+    var hour = mins === null ? 12 : Math.floor(mins / 60);
+    var hourly = w.hourly || [0, 1, 2, 3, 4, 5].map(function (i) {
+      return { time: i === 0 ? T("Now") : (hour + i) % 24 + (LANG === "ko" ? "시" : ""), icon: icon, temp: Math.round(temp + (night ? -0.6 : 0.4) * i) };
+    });
+    var dayIcon = icon === "moon" ? "sun" : icon;
+    var base = storyDate();
+    var daily = w.daily || ["sun", "partly", "cloud", "rain", "sun"].map(function (ic, i) {
+      return {
+        day: i === 0 ? T("Today") : fmt(addDays(base, i), { weekday: "short" }),
+        icon: i === 0 ? dayIcon : ic,
+        low: (w.low != null ? +w.low : temp - 5) + [0, 1, -1, 0, 2][i],
+        high: (w.high != null ? +w.high : temp + 4) + [0, -1, -2, 1, 0][i]
+      };
+    });
+    return {
+      city: w.city || T("Seoul"), temp: temp, icon: icon,
+      condition: w.condition || T(CONDITION[icon]),
+      high: w.high != null ? w.high : temp + 4,
+      low: w.low != null ? w.low : temp - 5,
+      hourly: hourly, daily: daily
+    };
+  }
+
+  // Weather symbols: sun, moon, partly, cloud, rain, snow, storm
+  function wIcon(name) {
+    var cloud = '<path fill="#fff" d="M7 18.5a4.5 4.5 0 0 1-.6-8.96A6 6 0 0 1 17.9 9.1a4.7 4.7 0 0 1-.4 9.4z"/>';
+    var up = function (s) { return '<g transform="translate(0 -3)">' + s + "</g>"; };
+    var rays = "";
+    for (var a = 0; a < 8; a++) {
+      var r = a * Math.PI / 4;
+      rays += '<path d="M' + (12 + 6.8 * Math.cos(r)).toFixed(1) + " " + (12 + 6.8 * Math.sin(r)).toFixed(1) + "L" +
+        (12 + 9 * Math.cos(r)).toFixed(1) + " " + (12 + 9 * Math.sin(r)).toFixed(1) + '"/>';
+    }
+    var sun = '<circle cx="12" cy="12" r="4.6" fill="#ffd60a"/><g stroke="#ffd60a" stroke-width="1.8" stroke-linecap="round">' + rays + "</g>";
+    var art = {
+      sun: sun,
+      moon: '<path fill="#fff" d="M15.5 3.5a8.5 8.5 0 1 0 5 15.3A7 7 0 0 1 15.5 3.5z"/>',
+      partly: '<g transform="translate(4 -4) scale(.75)">' + sun + '</g><g transform="translate(-1 2)">' + cloud + "</g>",
+      cloud: cloud,
+      rain: up(cloud) + '<path d="M8 18.5l-1 3M12 18.5l-1 3M16 18.5l-1 3" stroke="#64d2ff" stroke-width="1.8" stroke-linecap="round"/>',
+      snow: up(cloud) + '<g fill="#fff"><circle cx="8" cy="19.5" r="1.2"/><circle cx="12" cy="21" r="1.2"/><circle cx="16" cy="19.5" r="1.2"/></g>',
+      storm: up(cloud) + '<path fill="#ffd60a" d="M12.5 15 9 20h2.5l-1 4 4-5.5H12l1.5-3.5z"/>'
+    };
+    return svg(art[name] || art.sun, null, "wi");
   }
 
   function sum(list, key) {
     return (list || []).reduce(function (n, x) { return n + (x[key] || 0); }, 0);
   }
 
-  function empty(text) { return '<p class="empty">' + esc(text || "Nothing here.") + "</p>"; }
+  function empty(text) { return '<p class="empty">' + esc(text || T("Nothing here.")) + "</p>"; }
 
   function svg(inner, vb, cls) {
     return '<svg viewBox="' + (vb || "0 0 24 24") + '"' + (cls ? ' class="' + cls + '"' : "") +
@@ -74,6 +250,7 @@
       return [5, 12, 19].map(function (x) { return '<circle cx="' + x + '" cy="' + y + '" r="2.4" fill="currentColor"/>'; }).join("");
     }).join("")),
     vm: svg('<circle cx="6.5" cy="12" r="4" fill="none" stroke="currentColor" stroke-width="2.2"/><circle cx="17.5" cy="12" r="4" fill="none" stroke="currentColor" stroke-width="2.2"/><path d="M6.5 16h11" stroke="currentColor" stroke-width="2.2"/>'),
+    globe: svg('<circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M3 12h18M12 3c2.6 2.5 3.9 5.5 3.9 9s-1.3 6.5-3.9 9c-2.6-2.5-3.9-5.5-3.9-9S9.4 5.5 12 3z" fill="none" stroke="currentColor" stroke-width="1.6"/>', null, "globe"),
     lock: svg('<rect x="5" y="10.5" width="14" height="10" rx="2.5" fill="currentColor"/><path d="M8 10.5V8a4 4 0 0 1 8 0v2.5" fill="none" stroke="currentColor" stroke-width="2"/>'),
     flash: svg('<path d="M6.5 2h11v2.5l-2.5 4.5H9L6.5 4.5z" fill="currentColor"/><path d="M9 10h6v10a2 2 0 0 1-2 2h-2a2 2 0 0 1-2-2z" fill="currentColor"/><circle cx="12" cy="14" r="1.3" fill="rgba(0,0,0,.45)"/>'),
     cam: svg('<path d="M8.5 5 7 7H4.5A1.5 1.5 0 0 0 3 8.5v9A1.5 1.5 0 0 0 4.5 19h15a1.5 1.5 0 0 0 1.5-1.5v-9A1.5 1.5 0 0 0 19.5 7H17l-1.5-2z" fill="currentColor"/><circle cx="12" cy="13" r="3.3" fill="rgba(0,0,0,.45)"/>'),
@@ -107,11 +284,12 @@
     maps: svg('<path fill="#fff" d="M12 3a6 6 0 0 0-6 6c0 4.5 6 11 6 11s6-6.5 6-11a6 6 0 0 0-6-6z"/><circle cx="12" cy="9" r="2.3" fill="#2fb34f"/>'),
     books: svg('<path fill="#fff" d="M3 6.5c2.8-1.3 5.8-1.3 8.2.4v12c-2.4-1.6-5.4-1.6-8.2-.4zM21 6.5c-2.8-1.3-5.8-1.3-8.2.4v12c2.4-1.6 5.4-1.6 8.2-.4z"/>'),
     calendar: function () {
-      var dp = dateParts();
-      var font = "-apple-system,Inter,Arial,sans-serif";
+      var d = storyDate();
+      var top = LANG === "ko" ? fmt(d, { weekday: "long" }) : fmt(d, { weekday: "short" }).toUpperCase();
+      var font = "-apple-system,Inter,'Apple SD Gothic Neo','Noto Sans KR',Arial,sans-serif";
       return svg('<rect width="60" height="19" fill="#ff3b30"/>' +
-        '<text x="30" y="13.5" text-anchor="middle" font-size="10" font-weight="700" fill="#fff" font-family="' + font + '">' + esc(dp.wd.slice(0, 3).toUpperCase()) + "</text>" +
-        '<text x="30" y="47" text-anchor="middle" font-size="27" font-weight="400" fill="#1c1c1e" font-family="' + font + '">' + esc(dp.day) + "</text>", "0 0 60 60");
+        '<text x="30" y="13.5" text-anchor="middle" font-size="10" font-weight="700" fill="#fff" font-family="' + font + '">' + esc(top) + "</text>" +
+        '<text x="30" y="47" text-anchor="middle" font-size="27" font-weight="400" fill="#1c1c1e" font-family="' + font + '">' + d.getDate() + "</text>", "0 0 60 60");
     }
   };
 
@@ -130,19 +308,18 @@
     translate: { label: "Translate", view: "translate", bg: "linear-gradient(#6a78ff,#2b30c4)", glyph: G.translate },
     photos: { label: "Photos", view: "photos", bg: "linear-gradient(#ffb36b,#ff5f6d)", glyph: G.photos },
     // decorative apps (tapping shows an alert)
-    calendar: { label: "Calendar", deco: true, bg: "#fff", glyph: G.calendar, full: true },
+    calendar: { label: "Calendar", view: "calendar", bg: "#fff", glyph: G.calendar, full: true },
     camera: { label: "Camera", deco: true, bg: "linear-gradient(#f0f0f3,#a7a7b0)", glyph: G.camera },
     clock: { label: "Clock", deco: true, bg: "linear-gradient(#ff9a3c,#ff5b3a)", glyph: G.clock },
-    weather: { label: "Weather", deco: true, bg: "linear-gradient(#34428a,#0e1440)", glyph: G.moon },
+    weather: { label: "Weather", view: "weather", bg: "linear-gradient(#4aa3ff,#1a6fe0)", glyph: wIcon("partly") },
     settings: { label: "Settings", deco: true, bg: "linear-gradient(#8e9bb3,#566279)", glyph: G.gear },
     mail: { label: "Mail", deco: true, bg: "linear-gradient(#5fc2ff,#1a7cf5)", glyph: G.mail },
     music: { label: "Music", deco: true, bg: "linear-gradient(#ff6b8a,#fa2d48)", glyph: G.music },
     maps: { label: "Maps", deco: true, bg: "linear-gradient(#7be08f,#2fb34f)", glyph: G.maps },
     books: { label: "Books", deco: true, bg: "linear-gradient(#ffb13b,#ff8a00)", glyph: G.books }
   };
-  // Home screen pages (swipe left/right between them) and the dock
-  var GRID = ["calendar", "photos", "camera", "notes", "translate", "clock", "weather", "settings"];
-  var GRID2 = ["mail", "music", "maps", "books"];
+  // Home screen: page 1 has the widgets, page 2 has these apps. The dock is on both.
+  var GRID = ["calendar", "photos", "camera", "notes", "translate", "clock", "weather", "settings", "mail", "music", "maps", "books"];
   var homePage = 0;
   var DOCK = ["calls", "search", "messages", "chat"];
 
@@ -151,11 +328,36 @@
     var glyph = typeof a.glyph === "function" ? a.glyph() : a.glyph;
     var b = a.badge ? a.badge() : 0;
     return '<button class="app" type="button" ' +
-      (a.deco ? 'data-deco="' + esc(a.label) + '"' : 'data-open="' + a.view + '"') + ' aria-label="' + esc(a.label) + '">' +
+      (a.deco ? 'data-deco="' + esc(T(a.label)) + '"' : 'data-open="' + a.view + '"') + ' aria-label="' + esc(T(a.label)) + '">' +
       '<span class="icon" style="background:' + a.bg + '">' +
       (a.full ? '<span class="clip">' + glyph + "</span>" : glyph) +
       (b ? '<span class="badge">' + b + "</span>" : "") + "</span>" +
-      (inDock ? "" : '<span class="app-label">' + esc(a.label) + "</span>") + "</button>";
+      (inDock ? "" : '<span class="app-label">' + esc(T(a.label)) + "</span>") + "</button>";
+  }
+
+  // ---------- home screen page 1: Weather and Calendar widgets ----------
+  function widgetsPage() {
+    var w = weather();
+    var d = storyDate();
+    var events = (D.events || []).slice(0, 3);
+
+    var weatherW = '<button class="widget w-weather wbg-' + w.icon + '" type="button" data-open="weather">' +
+      '<span class="ww-top"><span><span class="ww-city">' + esc(w.city) + '</span><span class="ww-temp">' + esc(w.temp) + "°</span></span>" +
+      '<span class="ww-right">' + wIcon(w.icon) + '<span>' + esc(w.condition) + "</span><span>" + T("H:") + esc(w.high) + "° " + T("L:") + esc(w.low) + "°</span></span></span>" +
+      '<span class="ww-hours">' + w.hourly.slice(0, 6).map(function (h) {
+        return '<span class="ww-h"><span>' + esc(h.time) + "</span>" + wIcon(h.icon) + "<b>" + esc(h.temp) + "°</b></span>";
+      }).join("") + "</span></button>";
+
+    var calendarW = '<button class="widget w-cal" type="button" data-open="calendar">' +
+      '<span class="wc-top"><span class="wc-date"><span class="wc-wd">' + esc(fmt(d, { weekday: "long" })) + '</span><span class="wc-day">' +
+      d.getDate() + '</span></span><span class="wc-month"><span class="wc-mname">' + esc(fmt(d, { month: "long" })) + "</span>" + monthGrid(d) + "</span></span>" +
+      '<span class="wc-events">' + (events.length ? events.map(function (e) {
+        return '<span class="wc-ev" style="--c:' + esc(e.color || "#ff3b30") + '"><b>' + esc(e.title) + "</b><span>" +
+          esc([e.date, e.time].filter(Boolean).join(" · ")) + "</span></span>";
+      }).join("") : '<span class="wc-none">' + T("No upcoming events") + '</span>') + "</span></button>";
+
+    return '<div class="widgets"><div class="wgt">' + weatherW + '<span class="app-label">' + T("Weather") + '</span></div>' +
+      '<div class="wgt grow">' + calendarW + '<span class="app-label">' + T("Calendar") + '</span></div></div>';
   }
 
   function miniIcon(id) {
@@ -187,7 +389,7 @@
     (D.calls || []).forEach(function (c) {
       if (c.type !== "missed") return;
       out.push({
-        app: "calls", title: "Missed Call", time: c.time,
+        app: "calls", title: T("Missed Call"), time: c.time,
         body: c.name + (c.count > 1 ? " (" + c.count + ")" : ""),
         stack: [["home"], ["calls", "missed"]]
       });
@@ -226,7 +428,7 @@
       }
     });
     var end = msgs[msgs.length - 1];
-    if (!kt && end && end.from === "me") html += '<div class="receipt">Delivered</div>';
+    if (!kt && end && end.from === "me") html += '<div class="receipt">' + T("Delivered") + '</div>';
     return '<div class="bubbles">' + html + "</div>";
   }
 
@@ -274,26 +476,38 @@
             return '<button class="notif' + (n.more ? " stacked" : "") + '" type="button" data-notif="' + i + '">' +
               miniIcon(n.app) + '<span class="n-main"><span class="n-head"><b>' + esc(n.title) + "</b><span>" + esc(n.time) +
               '</span></span><span class="n-body">' + esc(n.body) + "</span>" +
-              (n.more ? '<span class="n-more">' + n.more + " more " + (n.more === 1 ? "message" : "messages") + "</span>" : "") +
+              (n.more ? '<span class="n-more">' + T(n.more === 1 ? "{n} more message" : "{n} more messages", n.more) + "</span>" : "") +
               "</span></button>";
           }).join("") + "</div>" +
-          '<div class="lock-bottom"><span class="lock-btn">' + I.flash + '</span><span class="lock-hint">Swipe up to open</span><span class="lock-btn">' + I.cam + "</span></div>"
+          '<div class="lock-bottom"><span class="lock-btn">' + I.flash + '</span><span class="lock-hint">' + T("Swipe up to open") + '</span><span class="lock-btn">' + I.cam + "</span></div>"
       };
     },
 
     home: function () {
+      var pages = [
+        widgetsPage(),
+        '<div class="home-grid">' + GRID.map(function (id) { return appIcon(id); }).join("") + "</div>"
+      ];
       return {
         nav: false, dark: true, cls: "home",
-        html: '<div class="hpages hscroll">' + [GRID, GRID2].map(function (ids) {
-            return '<div class="hpage"><div class="home-grid">' + ids.map(function (id) { return appIcon(id); }).join("") + "</div></div>";
+        html: '<div class="hpages hscroll">' + pages.map(function (p) {
+            return '<div class="hpage">' + p + "</div>";
           }).join("") + "</div>" +
-          '<div class="page-dots">' + [0, 1].map(function (i) {
+          '<div class="page-dots">' + pages.map(function (p, i) {
             return '<button type="button" data-page="' + i + '"' + (i === homePage ? ' class="on"' : "") + ' aria-label="Page ' + (i + 1) + '"></button>';
           }).join("") + "</div>" +
           '<div class="dock">' + DOCK.map(function (id) { return appIcon(id, true); }).join("") + "</div>",
         after: function (body, page) {
           var h = page.querySelector(".hpages");
           var dots = page.querySelectorAll(".page-dots button");
+          // on small screens, hide calendar events that don't fully fit (instead of cutting them in half)
+          var box = page.querySelector(".wc-events");
+          if (box) {
+            var limit = box.getBoundingClientRect().bottom;
+            Array.prototype.forEach.call(box.querySelectorAll(".wc-ev"), function (ev) {
+              if (ev.getBoundingClientRect().bottom > limit + 1) ev.style.visibility = "hidden";
+            });
+          }
           h.scrollLeft = homePage * h.clientWidth;
           h.addEventListener("scroll", function () {
             homePage = Math.round(h.scrollLeft / (h.clientWidth || 1));
@@ -303,23 +517,65 @@
       };
     },
 
+    calendar: function () {
+      var d = storyDate();
+      var groups = [];
+      (D.events || []).forEach(function (e) {
+        var key = e.date || "";
+        var g = groups.filter(function (x) { return x.date === key; })[0];
+        if (!g) groups.push(g = { date: key, list: [] });
+        g.list.push(e);
+      });
+      return {
+        title: fmt(d, { year: "numeric", month: "long" }), large: true, cls: "cal-app",
+        html: '<div class="cal-month">' + monthGrid(d) + "</div>" +
+          (groups.length ? groups.map(function (g) {
+            return '<div class="section-h">' + esc(g.date) + '</div><ul class="cal-list">' + g.list.map(function (e) {
+              return '<li style="--c:' + esc(e.color || "#ff3b30") + '"><span class="cal-bar"></span><span class="cal-main"><b>' +
+                esc(e.title) + "</b>" + (e.place ? "<span>" + esc(e.place) + "</span>" : "") + '</span><span class="cal-time">' +
+                esc(e.time || "") + "</span></li>";
+            }).join("") + "</ul>";
+          }).join("") : empty(T("No events.")))
+      };
+    },
+
+    weather: function () {
+      var w = weather();
+      var lo = Math.min.apply(null, w.daily.map(function (x) { return x.low; }));
+      var hi = Math.max.apply(null, w.daily.map(function (x) { return x.high; }));
+      var span = Math.max(1, hi - lo);
+      return {
+        nav: false, dark: true, cls: "weather-app wbg-" + w.icon,
+        html: '<div class="wa-head"><div class="wa-city">' + esc(w.city) + '</div><div class="wa-temp">' + esc(w.temp) + "°</div>" +
+          '<div class="wa-cond">' + esc(w.condition) + '</div><div class="wa-hl">' + T("H:") + esc(w.high) + "°  " + T("L:") + esc(w.low) + "°</div></div>" +
+          '<div class="wa-card"><h3>' + T("Hourly Forecast") + '</h3><div class="wa-hours">' + w.hourly.map(function (h) {
+            return "<div><span>" + esc(h.time) + "</span>" + wIcon(h.icon) + "<b>" + esc(h.temp) + "°</b></div>";
+          }).join("") + "</div></div>" +
+          '<div class="wa-card"><h3>' + T("{n}-Day Forecast", w.daily.length) + "</h3>" + w.daily.map(function (x) {
+            var left = ((x.low - lo) / span * 100).toFixed(0), right = ((hi - x.high) / span * 100).toFixed(0);
+            return '<div class="wa-day"><b>' + esc(x.day) + "</b>" + wIcon(x.icon) + '<span class="wa-lo">' + esc(x.low) +
+              '°</span><span class="wa-bar"><i style="left:' + left + "%;right:" + right + '%"></i></span><b>' + esc(x.high) + "°</b></div>";
+          }).join("") + "</div>"
+      };
+    },
+
     calls: function (arg) {
       var missedOnly = arg === "missed";
       var list = (D.calls || []).filter(function (c) { return !missedOnly || c.type === "missed"; });
       var tabs = [["Favorites", I.star], ["Recents", I.clock, 1], ["Contacts", I.person], ["Keypad", I.keypad], ["Voicemail", I.vm]];
       return {
-        title: "Recents", large: true,
-        navCenter: '<div class="seg"><button type="button" data-swap="calls" data-arg=""' + (missedOnly ? "" : ' class="on"') + '>All</button>' +
-          '<button type="button" data-swap="calls" data-arg="missed"' + (missedOnly ? ' class="on"' : "") + ">Missed</button></div>",
-        navRight: '<span class="nav-btn">Edit</span>',
+        title: T("Recents"), large: true,
+        navCenter: '<div class="seg"><button type="button" data-swap="calls" data-arg=""' + (missedOnly ? "" : ' class="on"') + '>' + T("All") + '</button>' +
+          '<button type="button" data-swap="calls" data-arg="missed"' + (missedOnly ? ' class="on"' : "") + ">" + T("Missed") + "</button></div>",
+        navRight: '<span class="nav-btn">' + T("Edit") + '</span>',
         html: list.length ? '<ul class="clist">' + list.map(function (c) {
           return '<li class="crow ' + esc(c.type) + '"><span class="call-dir">' + (c.type === "outgoing" ? I.phone : "") + "</span>" +
             '<span class="c-wrap"><span class="c-text"><span class="c-name">' + esc(c.name) + (c.count > 1 ? " (" + c.count + ")" : "") + "</span>" +
-            '<span class="c-sub">' + esc(CALL_LABEL[c.type] || c.type) + (c.duration ? " · " + esc(c.duration) : "") + "</span></span>" +
+            '<span class="c-sub">' + esc(T(CALL_LABEL[c.type] || c.type)) + (c.duration ? " · " + esc(c.duration) : "") + "</span></span>" +
             '<span class="c-time">' + esc(c.time) + '</span><span class="info">' + I.info + "</span></span></li>";
-        }).join("") + "</ul>" : empty(missedOnly ? "No missed calls." : "No recent calls."),
+        }).join("") + "</ul>" : empty(T(missedOnly ? "No missed calls." : "No recent calls.")),
         foot: '<nav class="tabbar">' + tabs.map(function (t) {
-          return '<span class="tab' + (t[2] ? " on" : "") + '">' + t[1] + "<small>" + t[0] + "</small></span>";
+          return '<span class="tab' + (t[2] ? " on" : "") + '">' + t[1] + "<small>" + T(t[0]) + "</small></span>";
         }).join("") + "</nav>"
       };
     },
@@ -327,13 +583,13 @@
     search: function () {
       var list = D.searches || [];
       return {
-        title: "Search", large: true,
-        html: searchField("Search or enter website") +
-          (list.length ? '<div class="sec-row"><b>Recent Searches</b><span>Clear</span></div><ul class="slist">' + list.map(function (s, i) {
+        title: T("Search"), large: true,
+        html: searchField(T("Search or enter website")) +
+          (list.length ? '<div class="sec-row"><b>' + T("Recent Searches") + '</b><span>' + T("Clear") + '</span></div><ul class="slist">' + list.map(function (s, i) {
             var q = typeof s === "string" ? s : s.q;
             return '<li><button class="srow" type="button" data-go="results" data-arg="' + i + '"><span class="hist">' + I.hist +
               '</span><span class="q">' + esc(q) + "</span></button></li>";
-          }).join("") + "</ul>" : empty("No recent searches."))
+          }).join("") + "</ul>" : empty(T("No recent searches.")))
       };
     },
 
@@ -342,27 +598,27 @@
       var q = typeof s === "string" ? s : s.q;
       var res = (typeof s === "object" && s.results) || [];
       return {
-        title: "", short: "Results",
+        title: "", short: T("Results"),
         html: searchField(q, true) + (res.length ? res.map(function (r) {
           return '<div class="result">' + (r.site ? '<div class="r-site">' + esc(r.site) + "</div>" : "") +
             '<div class="r-title">' + esc(r.title) + '</div><div class="r-snip">' + esc(r.snippet) + "</div></div>";
-        }).join("") : empty("The page didn't load."))
+        }).join("") : empty(T("The page didn't load.")))
       };
     },
 
     messages: function () {
       return {
-        title: "Messages", large: true,
-        navLeft: '<span class="nav-btn">Edit</span>',
+        title: T("Messages"), large: true,
+        navLeft: '<span class="nav-btn">' + T("Edit") + '</span>',
         navRight: '<span class="nav-btn">' + I.compose + "</span>",
-        html: searchField("Search") + threadRows(D.messages, "messages")
+        html: searchField(T("Search")) + threadRows(D.messages, "messages")
       };
     },
 
     chat: function () {
       return {
-        title: "", short: "Chats", cls: "kt-list",
-        navLeft: '<span class="kt-title">Chats</span>',
+        title: "", short: T("Chats"), cls: "kt-list",
+        navLeft: '<span class="kt-title">' + T("Chats") + '</span>',
         navRight: '<span class="nav-btn dark">' + I.mag + "</span>",
         html: threadRows(D.chats, "chats")
       };
@@ -380,7 +636,7 @@
         html: bubbles(t, kt),
         foot: kt
           ? '<div class="composer kt"><span class="c-plus">' + I.plus + '</span><span class="c-field"></span><span class="c-send">#</span></div>'
-          : '<div class="composer"><span class="c-plus">' + I.plus + '</span><span class="c-field">Text Message</span></div>',
+          : '<div class="composer"><span class="c-plus">' + I.plus + '</span><span class="c-field">' + T("Text Message") + '</span></div>',
         after: function (body) { body.scrollTop = body.scrollHeight; }
       };
     },
@@ -388,13 +644,13 @@
     notes: function () {
       var list = D.notes || [];
       return {
-        title: "Notes", large: true, cls: "grouped notes-app",
-        html: searchField("Search") + (list.length ? '<ul class="card">' + list.map(function (n, i) {
-          var first = String(n.body || "").split("\n").filter(Boolean)[0] || "No additional text";
+        title: T("Notes"), large: true, cls: "grouped notes-app",
+        html: searchField(T("Search")) + (list.length ? '<ul class="card">' + list.map(function (n, i) {
+          var first = String(n.body || "").split("\n").filter(Boolean)[0] || T("No additional text");
           return '<li><button class="nrow" type="button" data-go="note" data-arg="' + i + '"><b>' + esc(n.title) +
             "</b><span><em>" + esc(n.date) + "</em>" + esc(first) + "</span></button></li>";
         }).join("") + "</ul>" : empty()),
-        foot: '<div class="toolbar"><span></span><span class="tb-count">' + list.length + (list.length === 1 ? " Note" : " Notes") +
+        foot: '<div class="toolbar"><span></span><span class="tb-count">' + T(list.length === 1 ? "{n} Note" : "{n} Notes", list.length) +
           '</span><span class="tb-icon">' + I.compose + "</span></div>"
       };
     },
@@ -403,7 +659,7 @@
       var n = (D.notes || [])[i] || {};
       return {
         title: "", cls: "notes-app",
-        navRight: '<span class="nav-btn">Done</span>',
+        navRight: '<span class="nav-btn">' + T("Done") + '</span>',
         html: '<div class="note"><div class="note-date">' + esc(n.date) + "</div><h2>" + esc(n.title) +
           '</h2><div class="note-body">' + esc(n.body) + "</div></div>"
       };
@@ -411,12 +667,12 @@
 
     translate: function () {
       var list = D.translations || [];
-      var f = list[0] || { from: "English", to: "Korean" };
+      var f = list[0] || { from: T("English"), to: T("Korean") };
       return {
-        title: "Translate", large: true, cls: "grouped",
+        title: T("Translate"), large: true, cls: "grouped",
         html: '<div class="tr-langs"><span class="pill">' + esc(f.from) + '</span><span class="swap">⇄</span><span class="pill">' + esc(f.to) + "</span></div>" +
-          '<div class="tr-input">Enter text</div>' +
-          (list.length ? '<div class="section-h">Recent</div>' + list.map(function (t) {
+          '<div class="tr-input">' + T("Enter text") + '</div>' +
+          (list.length ? '<div class="section-h">' + T("Recent") + '</div>' + list.map(function (t) {
             return '<div class="card tr-card"><div class="tr-meta">' + esc(t.from) + " → " + esc(t.to) + '</div><div class="tr-in">' +
               esc(t.input) + '</div><div class="tr-out">' + esc(t.output) + "</div></div>";
           }).join("") : "")
@@ -426,10 +682,10 @@
     photos: function () {
       var list = D.photos || [];
       return {
-        title: "Photos", large: true,
+        title: T("Photos"), large: true,
         html: list.length ? '<div class="pgrid">' + list.map(function (p, i) {
           return '<button class="tile" type="button" data-go="photo" data-arg="' + i + '">' + photoEl(p) + "</button>";
-        }).join("") + '</div><div class="p-count">' + list.length + (list.length === 1 ? " Photo" : " Photos") + "</div>" : empty()
+        }).join("") + '</div><div class="p-count">' + T(list.length === 1 ? "{n} Photo" : "{n} Photos", list.length) + "</div>" : empty()
       };
     },
 
@@ -439,7 +695,7 @@
       var cur = +i || 0;
       var p = list[cur] || {};
       return {
-        title: p.date || "Photo", dark: true, cls: "photo-view",
+        title: p.date || T("Photo"), dark: true, cls: "photo-view",
         navCenter: '<div class="nav-2l"><b class="pv-date">' + esc(p.date || "") + '</b><span class="pv-cap">' + esc(p.caption || "") + "</span></div>",
         html: '<div class="pstrip hscroll">' + list.map(function (q) {
           return '<div class="pslide"><div class="pfull">' + photoEl(q) + "</div></div>";
@@ -479,7 +735,7 @@
     if (index < 2) return null;
     var p = stack[index - 1];
     var v = VIEWS[p[0]](p[1]);
-    return v.short || v.title || "Back";
+    return v.short || v.title || T("Back");
   }
 
   function currentPage() {
@@ -567,7 +823,7 @@
   function alertBox(title, msg) {
     var w = document.createElement("div");
     w.className = "alert-wrap";
-    w.innerHTML = '<div class="alert" role="alertdialog"><b>' + esc(title) + "</b><p>" + esc(msg) + '</p><button type="button">OK</button></div>';
+    w.innerHTML = '<div class="alert" role="alertdialog"><b>' + esc(title) + "</b><p>" + esc(msg) + '</p><button type="button">' + T("OK") + '</button></div>';
     w.querySelector("button").addEventListener("click", function () { w.remove(); });
     display.appendChild(w);
   }
@@ -597,7 +853,32 @@
     $("#story-body").innerHTML = (s.paragraphs || []).map(function (p) {
       return "<p>" + esc(p).replace(/\[\[(.+?)\]\]/g, '<button class="phone-link" type="button">$1</button>') + "</p>";
     }).join("");
+    renderLangPicker();
   }
+
+  // Language picker under the story (hide it with  languagePicker: false  in data.js)
+  var langBox = document.createElement("div");
+  langBox.className = "lang";
+  $("#story-body").parentNode.insertBefore(langBox, $("#story-body").nextSibling);
+
+  function renderLangPicker() {
+    if (RAW.languagePicker === false) { langBox.hidden = true; return; }
+    langBox.innerHTML = '<span class="lang-label">' + I.globe + esc(T("Language")) + "</span>" +
+      '<span class="lang-seg" role="group" aria-label="' + esc(T("Language")) + '">' +
+      [["en", "English"], ["ko", "한국어"]].map(function (l) {
+        return '<button type="button" data-lang="' + l[0] + '" lang="' + l[0] + '" aria-pressed="' + (LANG === l[0]) + '"' +
+          (LANG === l[0] ? ' class="on"' : "") + ">" + l[1] + "</button>";
+      }).join("") + "</span>";
+  }
+
+  langBox.addEventListener("click", function (e) {
+    var b = e.target.closest("[data-lang]");
+    if (!b || b.getAttribute("data-lang") === LANG) return;
+    setLang(b.getAttribute("data-lang"));
+    try { localStorage.setItem("phonePeekLang", LANG); } catch (err) { /* storage blocked */ }
+    renderStory();
+    if (!overlay.hidden) draw("");
+  });
 
   // ============================================================
   //  events
@@ -625,7 +906,7 @@
       return draw("open");
     }
     if ((el = t.closest("[data-deco]"))) {
-      return alertBox("Can't Open " + el.getAttribute("data-deco"), "This app isn't part of the story.");
+      return alertBox(T("Can't Open {n}", el.getAttribute("data-deco")), T("This app isn't part of the story."));
     }
     if ((el = t.closest("[data-swap]"))) {
       stack[stack.length - 1] = [el.getAttribute("data-swap"), el.getAttribute("data-arg")];
