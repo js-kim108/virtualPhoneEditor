@@ -17,17 +17,13 @@ window.PHONE_DATA = {
   // languagePicker: false,  // hide the language picker under the story
 
   story: {
-    title: { en: "The Last Train", ko: "막차" },
+    title: { en: "Missing", ko: "실종" },
     paragraphs: {
       en: [
-        "Seo-yeon left her phone on the café table when she ran for the last train. By the time Jun noticed, the door had already swung shut behind her.",
-        "He picked it up. The screen lit at his touch, no lock. He told himself he would only look for a number to call. [[Open her phone]]",
-        "Ten minutes later he was still reading."
+        "This must be [[Yoo Sung Woon's Phone]]."
       ],
       ko: [
-        "서연은 막차를 타러 뛰어가면서 카페 테이블에 휴대폰을 두고 갔다. 준이 알아챘을 때는 이미 문이 닫힌 뒤였다.",
-        "그는 휴대폰을 집어 들었다. 손이 닿자 화면이 켜졌다. 잠금도 없었다. 연락할 번호만 찾아보겠다고 스스로에게 말했다. [[그녀의 휴대폰 열기]]",
-        "10분이 지나도 그는 여전히 읽고 있었다."
+        "이건 [[유성운씨의 폰]]이다."
       ]
     }
   },
