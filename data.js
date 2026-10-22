@@ -12,9 +12,24 @@
 //  (The phone's own buttons and labels switch automatically.)
 // ============================================================
 
+// ------------------------------------------------------------
+//  PEOPLE: each name is written once here, in both languages,
+//  and used everywhere below (Recents, Contacts, Messages, Chat)
+//  so the names always match. To rename someone, change it here.
+//  To add a new person, add a line here and use that word
+//  (like MOM) below instead of typing the name in quotes.
+// ------------------------------------------------------------
+var OWNER   = { en: "Yoo Sung Woon", ko: "유성운" };
+var MOM     = { en: "Mom",           ko: "엄마" };
+var JUN     = { en: "Jun",           ko: "준" };
+var HANA    = { en: "Hana",          ko: "하나" };
+var MINHO   = { en: "Minho",         ko: "민호" };
+var UNKNOWN = { en: "Unknown",       ko: "알 수 없음" };
+
 window.PHONE_DATA = {
   // language: "ko",         // which language to start in (optional)
   // languagePicker: false,  // hide the language picker under the story
+  // appNames: { chat: { en: "Talk", ko: "톡" } },   // rename apps on the home screen (chat, messages, calls, notes, photos…)
 
   story: {
     title: { en: "Missing", ko: "실종" },
@@ -29,12 +44,15 @@ window.PHONE_DATA = {
   },
 
   owner: {
-    name: "유성운",
+    name: OWNER,
     time: "00:47",            // leave "" to show the real time
     date: { en: "Friday, October 13", ko: "10월 13일 금요일" },
     battery: 23,
     wallpaper: "",            // e.g. "img/wallpaper.jpg"
-    lockScreen: true          // false = skip the lock screen and open on the home screen
+    lockScreen: true,         // false = skip the lock screen and open on the home screen
+    status: { en: "Be right back", ko: "잠깐 다녀올게" }   // status message on their Chat profile
+    // photo: "img/me.jpg",   // profile picture
+    // cover: "img/sky.jpg"   // Chat profile background (a picture, or a color like "#334455")
   },
 
   // Weather widget. Everything is optional; leave out what you don't need.
@@ -60,11 +78,11 @@ window.PHONE_DATA = {
 
   // type: "missed" | "incoming" | "outgoing"
   calls: [
-    { name: "Gio", type: "missed", time: "23:02", count: 2 },
-    { name: "Juhyeon", type: "outgoing", time: "21:15", duration: "30:04" },
-    { name: "Unknown", type: "incoming", time: "18:40", duration: "12:31" },
-    { name: "Hana", type: "incoming", time: "Yesterday", duration: "3:02" },
-    { name: "Juhyeon", type: "missed", time: "Yesterday" }
+    { name: MOM, type: "missed", time: "23:02", count: 2 },
+    { name: JUN, type: "outgoing", time: "21:15", duration: "0:04" },
+    { name: UNKNOWN, type: "incoming", time: "18:40", duration: "12:31" },
+    { name: HANA, type: "incoming", time: { en: "Yesterday", ko: "어제" }, duration: "3:02" },
+    { name: JUN, type: "missed", time: { en: "Yesterday", ko: "어제" } }
   ],
 
   // Contacts: readers can call or text these people
@@ -79,28 +97,39 @@ window.PHONE_DATA = {
   //   delivered: false                        texts to them fail ("Not Delivered")
   //   note: "..."                             a note on their contact card
   //   photo: "img/mom.jpg"                    their picture
+  //
+  //   For the Chat app's Friends tab and profiles:
+  //   status: "..."                           their status message
+  //   cover: "img/beach.jpg" or "#556677"     their profile background
+  //   friend: false                           leave them out of the Friends tab
   contacts: [
     {
-      en: 
-      {
-        name: "Gio", phone: "010-2847-1193",
-        replies: ["Where are you?", "Please answer me."]
-      },
-      ko:
-      {
-        name: "지오", phone: "010-2847-1193",
-        replies: ["어디십니까?","대답해주세요."]
-      },
-      en: 
-      {
-        name: "Juhyeon", phone: "010-2348-2384",
-        replies: ["Who is it?"]
-      },
-      ko:
-      {
-        name: "주현", phone: "010-2348-2384",
-        replies: ["누구십니까?"]
+      name: MOM, phone: "010-2847-1193", status: "🌷",
+      replies: {
+        en: ["Where are you?", "Pick up your phone. Now."],
+        ko: ["어디야?", "전화 좀 받아. 지금 당장."]
       }
+    },
+    {
+      name: JUN, phone: "010-5520-7781", status: { en: "coffee first", ko: "커피 먼저" },
+      call: {
+        answer: true,
+        lines: {
+          en: ["Hello?", "...Hello? Who is this?", "Why aren't you saying anything?"],
+          ko: ["여보세요?", "...여보세요? 누구세요?", "왜 아무 말도 안 하세요?"]
+        }
+      },
+      replies: { en: ["who is this?"], ko: ["누구세요?"] }
+    },
+    {
+      name: HANA, phone: "010-3391-0456", status: "📚",
+      call: { message: { en: "The number you have dialed is not available. Please try again later.",
+                         ko: "지금 거신 전화는 전원이 꺼져 있어 음성사서함으로 연결됩니다." } },
+      note: { en: "Book club", ko: "북클럽" }
+    },
+    {
+      name: UNKNOWN, phone: "02-555-0132",
+      delivered: false, friend: false
     }
   ],
 
@@ -122,7 +151,7 @@ window.PHONE_DATA = {
   // unread: number shown on the app icon badge
   messages: [
     {
-      name: "Mom", unread: 2,
+      name: MOM, unread: 2,
       thread: [
         { from: "them", text: "Did you tell him yet?", time: "22:58" },
         { from: "me", text: "Not yet", time: "23:00" },
@@ -131,7 +160,7 @@ window.PHONE_DATA = {
       ]
     },
     {
-      name: "Unknown",
+      name: UNKNOWN,
       thread: [
         { from: "them", text: "This is Mr. Park from the leasing office. The Busan apartment is yours if you sign by Sunday.", time: "18:52" },
         { from: "me", text: "Thank you. I'll sign tomorrow.", time: "19:10" }
@@ -139,24 +168,32 @@ window.PHONE_DATA = {
     }
   ],
 
-  // group: true shows each sender's name
+  // Chat app (messenger)
+  //   group: true                      a group chat (shows member count and each sender's name)
+  //   members: [HANA, MINHO]           who's in a group (otherwise: everyone who wrote in it)
+  //   { date: "..." }                  a date divider
+  //   read: false                      on one of "me"'s messages: shows "1" (not read yet)
+  //   image: "img/photo.jpg"           a photo message (or a color like "#8899aa" as a stand-in)
+  //   replies: [...]                   replies when the reader types in this chat
   chats: [
     {
-      name: "Jun", unread: 1,
+      name: JUN, unread: 1,
       thread: [
-        { from: "Jun", text: "coffee tonight? same place", time: "17:20" },
+        { date: { en: "Thursday, October 12", ko: "10월 12일 목요일" } },
+        { from: JUN, text: "coffee tonight? same place", time: "17:20" },
         { from: "me", text: "ok. I have something to tell you", time: "17:31" },
-        { from: "Jun", text: "good news or bad news 😅", time: "17:32" },
-        { from: "me", text: "both I think", time: "17:40" }
+        { from: JUN, text: "good news or bad news 😅", time: "17:32" },
+        { from: "me", text: "both I think", time: "17:40", read: false }
       ]
     },
     {
       name: "Book club 📚", group: true,
       thread: [
-        { from: "Hana", text: "Seo-yeon is it true you're leaving??", time: "12:03" },
-        { from: "Minho", text: "wait what", time: "12:04" },
+        { date: { en: "Thursday, October 12", ko: "10월 12일 목요일" } },
+        { from: HANA, text: "Seo-yeon is it true you're leaving??", time: "12:03" },
+        { from: MINHO, text: "wait what", time: "12:04" },
         { from: "me", text: "don't tell Jun. I want to tell him myself", time: "12:10" },
-        { from: "Hana", text: "🤐", time: "12:11" }
+        { from: HANA, text: "🤐", time: "12:11" }
       ]
     }
   ],
